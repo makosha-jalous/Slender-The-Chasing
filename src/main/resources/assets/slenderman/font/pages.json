@@ -1,0 +1,11 @@
+{
+  "providers": [
+    {
+      "type": "ttf",
+      "file": "slenderman:disgusting.ttf",
+      "shift": [0.0, 0.0],
+      "size": 24.0,
+      "oversample": 4.0
+    }
+  ]
+}
