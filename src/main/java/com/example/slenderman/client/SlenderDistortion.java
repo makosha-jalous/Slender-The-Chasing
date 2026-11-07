@@ -122,7 +122,7 @@ public final class SlenderDistortion {
     private static final float BURN = 1.0F;
     private static final float WARM = 0.12F;
     /** how many waves fit into the height of the plane (the old screen version had dozens: that was too many). */
-    private static final float MASK_WAVES = 5.0F;
+    private static final float MASK_WAVES = 2.4F;
     /** how strong the bending of the plane is against the old screen version (the original bends the picture less: ghosts and ripples, not melting). */
     private static final float MASK_AMOUNT = 0.30F;
 

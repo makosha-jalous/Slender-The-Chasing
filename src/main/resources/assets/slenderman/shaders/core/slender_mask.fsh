@@ -14,6 +14,12 @@ uniform vec4 Edge;     // x = width of the soft side border (share of the plane)
 in vec2 uv;
 out vec4 fragColor;
 
+// the character of the waves: LONG, slow waves (fewer of them over the height), not a fine ripple. Bigger WAVE_STRETCH = more variety
+// between flashes; BURN_GAIN = how hard the light parts are overexposed.
+const float WAVE_STRETCH = 1.8;
+const float WAVE_SPEED = 0.9;
+const float BURN_GAIN = 2.8;
+
 float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
@@ -38,9 +44,9 @@ void main() {
     // the waves are NOT the same everywhere: bands along the height with a different amplitude, a different stretch (frequency)
     float band = vnoise(vec2(uv.y * 2.2 + seed * 3.0, t * 0.7 + seed));
     float amp = 0.40 + 1.50 * band * band;
-    float freq = mix(Wave.z, Wave.z * 3.2, st);
-    float sx = vnoise(vec2(uv.y * freq + t * 1.3 + seed * 5.0, uv.x * 1.2 - t * 0.5))
-             + vnoise(vec2(uv.y * freq * 2.3 - t * 2.1, uv.x * 2.6 + seed * 3.0)) - 1.0;
+    float freq = mix(Wave.z, Wave.z * WAVE_STRETCH, st);
+    float sx = vnoise(vec2(uv.y * freq + t * WAVE_SPEED + seed * 5.0, uv.x * 1.2 - t * 0.5))
+             + vnoise(vec2(uv.y * freq * 1.6 - t * WAVE_SPEED * 1.5, uv.x * 2.6 + seed * 3.0)) - 1.0;
     float sy = vnoise(vec2(uv.x * 2.0 + t * 0.7 + seed, uv.y * 1.5 + t * 1.1))
              + vnoise(vec2(uv.x * 3.1 - t * 1.4, uv.y * 2.2 - t * 0.6 + seed)) - 1.0;
     float amount = Wave.x * w * w;
@@ -59,7 +65,7 @@ void main() {
     float warm = smoothstep(-0.03, 0.10, c.r - c.b);
     float weight = hi * (0.40 + 0.60 * warm);
     float burn = Effect.x * w * weight * (0.55 + 0.90 * band);
-    c *= 1.0 + burn * 2.0;
+    c *= 1.0 + burn * BURN_GAIN;
     float peak = max(c.r, max(c.g, c.b));
     c = mix(c, vec3(peak), clamp(burn, 0.0, 1.0) * 0.35);            // white-hot: the colours are pulled together
 
