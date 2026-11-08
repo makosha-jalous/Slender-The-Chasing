@@ -54,8 +54,8 @@ public final class SlenderDistortion {
     /** how often the dice are thrown (ms): 16 = about 60 times a second whatever the FPS is. */
     private static final long ROLL_MS = 16L;
     /** how far the rectangle reaches beyond his body (blocks, to the sides / up and down). */
-    private static final double PAD_SIDE = 2.6D;        // much wider than his body, like the plane of the original (was 0.7)
-    private static final double PAD_UPDOWN = 0.0D;
+    private static final double PAD_SIDE = 3.0D;        // much wider than his body, like the plane of the original (was 0.7)
+    private static final double PAD_UPDOWN = 1.5D;
     /** the waving sideways (share of the rectangle width). */
     private static final float WAVE = 0.07F;
     /** the shift of the colour channels (share of the rectangle width). */
@@ -99,10 +99,10 @@ public final class SlenderDistortion {
     private static final double LIGHT_NEAR = 14.0D;
     /** inside the rectangle (the shader): the colours fade (0..1), the contrast and the brightness are pushed up. NOT a colour layer. */
     private static final float EXPOSE_DESAT = 0.0F;
-    private static final float EXPOSE_CONTRAST = 1.2F;
-    private static final float EXPOSE_BRIGHT = 0.5F;
+    private static final float EXPOSE_CONTRAST = 3.0F;
+    private static final float EXPOSE_BRIGHT = 1.5F;
     /** near him (full strength of the burst) the bending and the colour split grow to these values (the video of the original). */
-    private static final float NEAR_DISPLACE_GAIN = 7.0F;
+    private static final float NEAR_DISPLACE_GAIN = 5.0F;
     private static final float NEAR_CA_SHIFT = 0.0F;
     /** the same, only light, for the case the small shader could not be loaded. */
     private static final float EXPOSE_LIGHT = 0.55F;
