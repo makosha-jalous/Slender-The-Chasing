@@ -168,5 +168,87 @@
         "stream": false
       }
     ]
+  },
+  "footstep_clothing": {
+    "category": "players",
+    "sounds": [
+      {
+        "name": "slenderman:footsteps/clothing1",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/clothing3",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/clothing4",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/clothing5",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/clothing6",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/clothing7",
+        "stream": false
+      }
+    ]
+  },
+  "footstep_step": {
+    "category": "players",
+    "sounds": [
+      {
+        "name": "slenderman:footsteps/step1",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/step12",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/step14",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/step15",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/step19",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/step2",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/step20",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/step6",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/step8",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/step9",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/stepleft",
+        "stream": false
+      },
+      {
+        "name": "slenderman:footsteps/stepright",
+        "stream": false
+      }
+    ]
   }
 }
