@@ -18,7 +18,7 @@ import net.minecraftforge.fml.common.Mod;
  * Our own footsteps instead of the vanilla ones (grass, dirt, gravel, wood, snow ... everything EXCEPT sand, stone and metal).
  *
  * One step = two sounds at once: a random "clothing" + a random "step" (sounds.json: footstep_clothing / footstep_step).
- * Volume: walking 40 %, running 70 %.
+ * Volume: walking 20 %, running 50 %.
  *
  * It does not make its own rhythm: it replaces every vanilla step sound of the player ("block.xxx.step" right at the player),
  * so the pace is the vanilla pace, and in the camera mode - the pace of the camera mod (it plays its own steps through the
@@ -28,8 +28,8 @@ import net.minecraftforge.fml.common.Mod;
 public class SlenderFootsteps {
     /** switch for the whole thing */
     public static final boolean ENABLED = true;
-    public static final float WALK_VOLUME = 0.40F;
-    public static final float RUN_VOLUME = 0.70F;
+    public static final float WALK_VOLUME = 0.20F;
+    public static final float RUN_VOLUME = 0.50F;
 
     /** the surfaces that keep their vanilla step: sand, stone and metal (and the things that sound like them) */
     private static final String[] KEEP_VANILLA = {
@@ -62,6 +62,6 @@ public class SlenderFootsteps {
     private static void play(Minecraft mc, SoundEvent ev, float vol) {
         mc.getSoundManager().play(new SimpleSoundInstance(ev.getLocation(), SoundSource.PLAYERS, vol, 1.0F,
                 RandomSource.create(), false, 0, SoundInstance.Attenuation.NONE,
-                mc.player.getX(), mc.player.getY(), mc.player.getZ(), true));
+                0.0, 0.0, 0.0, true));   // relative to the listener: (0,0,0) = right in the head, both ears
     }
 }
