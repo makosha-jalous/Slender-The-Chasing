@@ -152,8 +152,13 @@ public final class PageHighlight {
                     RenderSystem.blendFunc(com.mojang.blaze3d.platform.GlStateManager.SourceFactor.SRC_ALPHA,
                             com.mojang.blaze3d.platform.GlStateManager.DestFactor.ONE);          // added to the picture
                     RenderSystem.disableCull();
-                    RenderSystem.disableDepthTest();
                     RenderSystem.setShader(GameRenderer::getPositionColorShader);
+                    // the hand is in front of the page: its silhouette is written to the depth buffer first (no colour), the glow is
+                    // drawn behind it (farther), so it never goes over the flashlight hand
+                    RenderSystem.enableDepthTest();
+                    RenderSystem.depthFunc(515);
+                    maskHand(e.getPoseStack().last().pose(), gw, gh);
+                    RenderSystem.depthMask(false);
                 }
                 drawGlow(e.getPoseStack().last().pose(), poly, lv * GAIN, SIGMA * gh);
             }
@@ -162,6 +167,8 @@ public final class PageHighlight {
         } finally {
             if (prepared) {
                 RenderSystem.defaultBlendFunc();
+                RenderSystem.depthMask(true);
+                RenderSystem.colorMask(true, true, true, true);
                 RenderSystem.enableDepthTest();
                 RenderSystem.enableCull();
                 RenderSystem.disableBlend();
@@ -264,6 +271,39 @@ public final class PageHighlight {
             }
         }
         BufferUploader.drawWithShader(b.end());
+    }
+
+    private static java.lang.reflect.Method maskMethod;
+    private static boolean maskFailed;
+
+    /** the screen shape of the flashlight hand (from the flashlight mod, by reflection - the mods stay independent), written only into the depth buffer. */
+    private static void maskHand(Matrix4f m, int gw, int gh) {
+        if (maskFailed) return;
+        try {
+            if (maskMethod == null) {
+                maskMethod = Class.forName("com.example.slenderflashlight.client.FlashlightClient").getMethod("handMask");
+            }
+            float[] q = (float[]) maskMethod.invoke(null);
+            if (q == null || q.length < 8) return;
+            RenderSystem.colorMask(false, false, false, false);
+            RenderSystem.depthMask(true);
+            BufferBuilder b = Tesselator.getInstance().getBuilder();
+            b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+            for (int i = 0; i + 7 < q.length; i += 8) {
+                for (int k = 0; k < 4; k++) {
+                    float x = (q[i + k * 2] * 0.5F + 0.5F) * gw;
+                    float y = (1F - (q[i + k * 2 + 1] * 0.5F + 0.5F)) * gh;
+                    b.vertex(m, x, y, 10F).color(0, 0, 0, 0).endVertex();
+                }
+            }
+            BufferUploader.drawWithShader(b.end());
+            RenderSystem.colorMask(true, true, true, true);
+        } catch (ClassNotFoundException | NoSuchMethodException ex) {
+            maskFailed = true;       // the flashlight mod is not there: nothing to hide behind
+        } catch (Throwable ex) {
+            RenderSystem.colorMask(true, true, true, true);
+            maskFailed = true;
+        }
     }
 
     private static void glowVertex(BufferBuilder b, Matrix4f m, float x, float y, float alpha) {

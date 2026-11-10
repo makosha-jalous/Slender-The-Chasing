@@ -239,6 +239,21 @@ public class SlendermanEntity extends PathfinderMob {
     private static final double ORIGINAL_WALK_BASE = 0.5D;
     /** 1.0 = the speed of the original in blocks per second; make it smaller to slow him down. */
     private static final double ORIGINAL_WALK_SCALE = 1.0D;
+    /**
+     * Keeping the page distance: when he is farther than the band of the page (BAND_MAX), he walks at least as fast as the player times this
+     * (index = pages), so he always manages to come back to his distance; the more pages, the faster than the player he is.
+     */
+    private static final double[] CATCH_PLAYER_MUL = {1.0, 1.0, 1.0, 1.05, 1.1, 1.2, 1.3, 1.4, 1.4};
+    /** and for every block beyond the band he adds this much (blocks per second), at most CATCH_GAP_MAX. */
+    private static final double CATCH_GAP_BPS = 0.35D;
+    private static final double CATCH_GAP_MAX = 6.0D;
+    /** the walking speed never goes beyond this (blocks per second). */
+    private static final double WALK_BPS_MAX = 12.0D;
+    /** a teleport IN FRONT of the player (in his view cone or in the direction he walks) never puts him closer than this (3.0 .. 4.0, random): a moment to turn away. */
+    private static final double FRONT_MIN_DIST = 3.0D;
+    private static final double FRONT_MIN_RANDOM = 1.0D;
+    /** "in front": the angle to the view / walking direction is smaller than about 60 degrees. */
+    private static final double FRONT_COS = 0.5D;
     /** blocks per tick of this entity at speed modifier 1.0 (MOVEMENT_SPEED 0.12 * 2.158). */
     private static final double BLOCKS_PER_TICK_AT_ONE = 0.12D * 2.158D;
     /** "angry" (4 sightings) or the player is inside a structure (50 %): the teleport distance is an eighth of the page distance ... */
@@ -1346,6 +1361,12 @@ public class SlendermanEntity extends PathfinderMob {
             double distance = lo + this.random.nextDouble() * (hi - lo);
             double x = player.getX() + Math.cos(angle) * distance;
             double z = player.getZ() + Math.sin(angle) * distance;
+            if (this.isInFront(player, x, z)) {
+                // in front of the player: as far as the band allows (the upper quarter of it), never closer than 3-4 blocks
+                distance = Math.max(FRONT_MIN_DIST + this.random.nextDouble() * FRONT_MIN_RANDOM, hi - this.random.nextDouble() * 0.25D * (hi - lo));
+                x = player.getX() + Math.cos(angle) * distance;
+                z = player.getZ() + Math.sin(angle) * distance;
+            }
             if (this.tooCloseToPlayer(player, x, z)) continue;
             double need = attempt < 24 ? 4.0D : (attempt < 44 ? 3.0D : 2.0D);
             double y = this.findGround(x, z, player.getY(), need, planeDy);
@@ -1361,11 +1382,30 @@ public class SlendermanEntity extends PathfinderMob {
         return false;
     }
 
+    /** the spot (x, z) is in front of the player: in his view cone, or in the direction he is walking. */
+    private boolean isInFront(Player player, double x, double z) {
+        double dx = x - player.getX();
+        double dz = z - player.getZ();
+        double len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 1.0E-3D) return true;
+        dx /= len;
+        dz /= len;
+        Vec3 look = player.getViewVector(1.0F);
+        double ll = Math.sqrt(look.x * look.x + look.z * look.z);
+        if (ll > 1.0E-3D && (look.x * dx + look.z * dz) / ll > FRONT_COS) return true;
+        Vec3 mv = player.getDeltaMovement();
+        double ml = Math.sqrt(mv.x * mv.x + mv.z * mv.z);
+        return ml > 0.03D && (mv.x * dx + mv.z * dz) / ml > FRONT_COS;
+    }
+
     /** CalculateMove(1): a step of 4 blocks towards the player; when he is already inside the band, a random spot around himself. */
     private boolean moveOne(Player player, int st) {
         double dist = this.distanceTo(player);
         if (dist > BAND_MIN[st]) {
-            return this.creepCloser(player, 4.0D, CATCH_DIST + 0.6D);
+            // the step brings him closer; when he is in front of the player he stays at least 3-4 blocks away
+            double keep = this.isInFront(player, this.getX(), this.getZ())
+                    ? FRONT_MIN_DIST + this.random.nextDouble() * FRONT_MIN_RANDOM : CATCH_DIST + 0.6D;
+            return this.creepCloser(player, 4.0D, keep);
         }
         for (int attempt = 0; attempt < 24; attempt++) {
             double angle = this.random.nextDouble() * Math.PI * 2.0D;
@@ -1396,6 +1436,13 @@ public class SlendermanEntity extends PathfinderMob {
             return false;
         }
         double blocksPerSecond = (st + LEVEL + ORIGINAL_WALK_BASE) * ORIGINAL_WALK_SCALE;
+        if (dist > BAND_MAX[st]) {
+            // too far behind the page distance: at least as fast as the player (times the page factor) plus a bit for every block of the gap
+            double playerBps = this.playerSpeed * 20.0D;
+            blocksPerSecond = Math.max(blocksPerSecond, playerBps * CATCH_PLAYER_MUL[st])
+                    + Math.min(CATCH_GAP_MAX, (dist - BAND_MAX[st]) * CATCH_GAP_BPS);
+        }
+        blocksPerSecond = Math.min(blocksPerSecond, WALK_BPS_MAX);
         double mul = blocksPerSecond / 20.0D / BLOCKS_PER_TICK_AT_ONE;
         Vec3 goal = player.position();
         this.walkToward(goal.x, goal.y, goal.z, mul);
