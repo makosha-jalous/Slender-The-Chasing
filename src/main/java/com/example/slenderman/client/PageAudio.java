@@ -41,6 +41,14 @@ public class PageAudio {
         if (pickup && pages > 0) {
             mc.getSoundManager().play(SimpleSoundInstance.forUI(SlendermanMod.PAGE_GRAB.get(), 1.0F, 1.0F));
         }
+        // the 8th page: the camera mod (if it is installed) cuts all its distortion sounds and flashes for one second
+        if (pickup && pages >= 8 && com.example.slenderman.SlenderFinale.ENABLED) {
+            try {
+                Class.forName("com.example.slendercam.client.CameraEffects").getMethod("finaleFlash").invoke(null);
+            } catch (Throwable ignored) {
+                // no camera mod (or an old one): only the silence
+            }
+        }
 
         int group = groupFor(pages);
         if (group == currentGroup) return;   // same group: the music just keeps playing
@@ -53,8 +61,8 @@ public class PageAudio {
             startLoop(group);
         }
         if (old != null) {
-            if (pages >= 8) old.fadeOut(FINAL_FADE_TICKS);
-            else old.halt();
+            if (pages >= 8 && !com.example.slenderman.SlenderFinale.ENABLED) old.fadeOut(FINAL_FADE_TICKS);
+            else old.halt();   // the 8th page of the new finale: the music of page 7 is cut at once
         }
     }
 

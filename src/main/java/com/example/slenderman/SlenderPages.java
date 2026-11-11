@@ -28,6 +28,11 @@ public final class SlenderPages {
         int count = Math.min(TOTAL, get(player) + 1);
         player.getPersistentData().putInt(KEY, count);
         SlenderNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new PagesCollectedMessage(count));
+        // the 8th page: the NEW finale (sanity 0 at once, he is gone, a calm) - the old per-entity finale is not used then
+        if (count >= TOTAL && SlenderFinale.ENABLED) {
+            SlenderFinale.start(player);
+            return;
+        }
         // from the first page on he is in the world (also on peaceful difficulty)
         if (count < TOTAL) {
             SlendermanEntity fresh = ensureSlenderman(player);
@@ -69,11 +74,13 @@ public final class SlenderPages {
     public static void clearForNewLife(Player player) {
         player.getPersistentData().putInt(KEY, 0);
         SlenderSanity.reset(player);
+        SlenderFinale.clear(player);
     }
 
     public static void reset(ServerPlayer player) {
         player.getPersistentData().putInt(KEY, 0);
         SlenderSanity.reset(player);
+        SlenderFinale.clear(player);
         sync(player);
     }
 }
