@@ -119,10 +119,10 @@ public final class SlenderDistortion {
     private static final double MASK_BELOW = 0.7D;
     private static final double MASK_ABOVE = 1.0D;
     /** the burn-out of the light parts of the picture (0..1) and the warm streaks in the dark parts: they are NOT a light overlay. */
-    private static final float BURN = 1.0F;
+    private static final float BURN = 1.5F;
     private static final float WARM = 0.12F;
     /** how many waves fit into the height of the plane (the old screen version had dozens: that was too many). */
-    private static final float MASK_WAVES = 2.4F;
+    private static final float MASK_WAVES = 1.0F;
     /** how strong the bending of the plane is against the old screen version (the original bends the picture less: ghosts and ripples, not melting). */
     private static final float MASK_AMOUNT = 0.30F;
 
