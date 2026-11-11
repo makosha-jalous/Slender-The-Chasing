@@ -54,10 +54,10 @@ public final class SlenderDistortion {
     /** how often the dice are thrown (ms): 16 = about 60 times a second whatever the FPS is. */
     private static final long ROLL_MS = 16L;
     /** how far the rectangle reaches beyond his body (blocks, to the sides / up and down). */
-    private static final double PAD_SIDE = 3.0D;        // much wider than his body, like the plane of the original (was 0.7)
-    private static final double PAD_UPDOWN = 1.5D;
+    private static final double PAD_SIDE = 4.0D;        // much wider than his body, like the plane of the original (was 0.7)
+    private static final double PAD_UPDOWN = 2.0D;
     /** the waving sideways (share of the rectangle width). */
-    private static final float WAVE = 0.07F;
+    private static final float WAVE = 0.04F;
     /** the shift of the colour channels (share of the rectangle width). */
     private static final float COLOR_SHIFT = 0.018F;
     /** he is not distorted when he is further away than this (blocks). */
@@ -68,14 +68,14 @@ public final class SlenderDistortion {
     /** the net of the soft border. */
     private static final int FI = 12, FJ = 16;
     /** the original shader: strength (0.1..0.3, default 0.2) and transparency (0.01..0.1, default 0.05). */
-    private static final float STRENGTH = 0.2F;
+    private static final float STRENGTH = 0.1F;
     private static final float TRANSPARENCY = 0.05F;
     /** how many times the noise texture repeats over the rectangle (the tiling of the original is not known). */
     private static final float NOISE_TILE_U = 1.0F;
     /** the waves are long vertical streaks, like in the original picture: the noise is finer from top to bottom. */
     private static final float NOISE_TILE_V = 3.0F;
     /** how much stronger the bending is than the plain formula (the original bends the picture a lot). */
-    private static final float DISPLACE_GAIN = 2.5F;
+    private static final float DISPLACE_GAIN = 1.0F;
     /** the net of the heat waves. */
     private static final int HI = 24, HJ = 40;
     /** our extra colours (contrast, burnt, washed out) that are NOT in the original shader: false = the pure original. */
@@ -99,10 +99,10 @@ public final class SlenderDistortion {
     private static final double LIGHT_NEAR = 14.0D;
     /** inside the rectangle (the shader): the colours fade (0..1), the contrast and the brightness are pushed up. NOT a colour layer. */
     private static final float EXPOSE_DESAT = 0.0F;
-    private static final float EXPOSE_CONTRAST = 3.0F;
+    private static final float EXPOSE_CONTRAST = 5.0F;
     private static final float EXPOSE_BRIGHT = 1.5F;
     /** near him (full strength of the burst) the bending and the colour split grow to these values (the video of the original). */
-    private static final float NEAR_DISPLACE_GAIN = 5.0F;
+    private static final float NEAR_DISPLACE_GAIN = 3.0F;
     private static final float NEAR_CA_SHIFT = 0.0F;
     /** the same, only light, for the case the small shader could not be loaded. */
     private static final float EXPOSE_LIGHT = 0.55F;
