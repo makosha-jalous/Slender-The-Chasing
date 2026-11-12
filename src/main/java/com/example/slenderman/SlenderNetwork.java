@@ -17,5 +17,7 @@ public final class SlenderNetwork {
     public static void register() {
         CHANNEL.registerMessage(0, PagesCollectedMessage.class,
                 PagesCollectedMessage::encode, PagesCollectedMessage::decode, PagesCollectedMessage::handle);
+        CHANNEL.registerMessage(1, SlenderFinaleMessage.class,
+                SlenderFinaleMessage::encode, SlenderFinaleMessage::decode, SlenderFinaleMessage::handle);
     }
 }

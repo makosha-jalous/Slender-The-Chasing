@@ -304,13 +304,6 @@ public class SlendermanEntity extends PathfinderMob {
     private static final float SANITY_RUSH_OFF = 50.0F;
     private static final double SANITY_HIT_RANGE = 3.2D;
     private static final float SANITY_KILL_DAMAGE = 10000.0F;
-    /** finale: he is gone for 10 s, then stands behind the player for 7 s, then disappears for good. */
-    private static final int FINALE_NONE = 0;
-    private static final int FINALE_HIDE = 1;
-    private static final int FINALE_HOLD = 2;
-    private static final int FINALE_HIDE_TICKS = 20 * 10;
-    private static final int FINALE_HOLD_TICKS = 20 * 7;
-
     // ---- animations ----
     public static final int ACTION_NONE = 0;
     /** quick reach with the right arm over his head (1 s). */
@@ -376,8 +369,10 @@ public class SlendermanEntity extends PathfinderMob {
     private int ambushTicks = 0;
     private int watchTicks = 0;
     private int damageTicks = 10;
-    private int finalePhase = FINALE_NONE;
-    private int finaleTicks = 0;
+    /** the NEW finale (SlenderFinale): the server of the finale places him, he only stands, shows the tentacles and never kills. */
+    private boolean finaleMode = false;
+    /** in the finale mode: true = the sanity of the player goes by the normal rule (right behind his back it falls without looking); false = it is set by the finale. */
+    private boolean finaleRealSanity = false;
     private int animCooldown = 0;
     private int idleTicks = 0;
     private Vec3 lastPlayerPos = null;
@@ -624,6 +619,10 @@ public class SlendermanEntity extends PathfinderMob {
             this.standStill();
             return;
         }
+        if (this.finaleMode) {             // the finale of the 8th page
+            this.runFinaleMode(player);
+            return;
+        }
         if (this.demoWalkTicks > 0) {      // /slender animations walk
             this.demoWalkStep(player);
             return;
@@ -642,10 +641,6 @@ public class SlendermanEntity extends PathfinderMob {
         final boolean god = SlenderModes.isGod(player);
 
         this.updateStage(player);
-        if (this.finalePhase != FINALE_NONE) {
-            this.runFinale(player);
-            return;
-        }
 
         // ---- sanity: rises while the player looks at him, falls when he does not; at 100 he kills ----
         this.trackPlayerMovement(player);
@@ -1167,17 +1162,10 @@ public class SlendermanEntity extends PathfinderMob {
         return Math.max(pages, Math.min(TIME_STAGE_MAX, timed));
     }
 
-    /** the stage follows the pages of the player he hunts; the 8th page starts the finale. */
+    /** the stage follows the pages of the player he hunts. */
     private void updateStage(Player player) {
         int pages = SlenderPages.get(player);
         this.stage = Mth.clamp(this.timedPages(player, pages), 1, SlenderPages.TOTAL);
-        if (pages >= SlenderPages.TOTAL) {
-            if (this.finalePhase == FINALE_NONE) this.startFinale(player);
-        } else if (this.finalePhase != FINALE_NONE) {
-            // the pages were reset during the finale: back to normal
-            this.finalePhase = FINALE_NONE;
-            this.setInvisible(false);
-        }
     }
 
     /** one ambush teleport; the kind depends on the stage. */
@@ -1227,47 +1215,32 @@ public class SlendermanEntity extends PathfinderMob {
         player.hurt(this.attackSource(), dist < 1.2D ? damage * 2.0F : damage);
     }
 
-    /** 8th page: silence, he is gone for 10 s ... */
-    private void startFinale(Player player) {
-        this.finalePhase = FINALE_HIDE;
-        this.finaleTicks = FINALE_HIDE_TICKS;
+    /** the finale of the 8th page (SlenderFinale) switches this on: he is placed by the finale, shows the tentacles and kills nobody. */
+    public void setFinaleMode(boolean on) {
+        this.finaleMode = on;
         this.vanished = false;
-        this.vanishTicks = 0;
-        this.endAction();
-        this.aggression = 0.0F;
-        this.tentGoal = false;
-        this.parkFarAway(player);
-        this.setInvisible(true);
+        this.setInvisible(false);
+        this.entityData.set(DATA_HIDDEN, false);
+        if (on) this.endAction();
     }
 
-    /** ... then he teleports right behind the player, stands there with the static at its maximum, and disappears. */
-    private void runFinale(Player player) {
+    public void setFinaleRealSanity(boolean on) {
+        this.finaleRealSanity = on;
+    }
+
+    /** in the finale mode: stands, looks at the player, the aggression is full and the tentacles grow with the sanity loss of the player. */
+    private void runFinaleMode(Player player) {
         this.standStill();
-        if (this.finalePhase == FINALE_HIDE) {
-            this.aggression = 0.0F;
-            this.entityData.set(DATA_AGGRESSION, 0.0F);
-            this.updateTentacles(false);
-            if (--this.finaleTicks > 0) return;
-            this.setInvisible(false);
-            if (!this.teleportNear(player, TeleportKind.BEHIND)) {
-                this.teleportNear(player, TeleportKind.CLOSE);
-            }
-            this.finalePhase = FINALE_HOLD;
-            this.finaleTicks = FINALE_HOLD_TICKS;
-            this.sendCue(1 + this.random.nextInt(SlendermanMod.SCREAMS.size()));
-        } else {
-            this.aggression = 1.0F;
-            this.entityData.set(DATA_AGGRESSION, 1.0F);
-            this.tentGoal = true;
-            this.updateTentacles(true);
-            this.faceToward(player.position(), 20.0F);
-            Vec3 eye = player.getEyePosition();
-            this.getLookControl().setLookAt(eye.x, eye.y, eye.z, 30.0F, 30.0F);
-            if (--this.finaleTicks <= 0) {
-                SlenderSanity.reset(player);
-                this.discard();   // the player has won
-            }
-        }
+        this.aggression = 1.0F;
+        this.entityData.set(DATA_AGGRESSION, 1.0F);
+        if (this.finaleRealSanity) this.updateSanity(player, this.isSeenBy(player), this.distanceTo(player));
+        float lost = SlenderSanity.get(player);
+        this.entityData.set(DATA_SANITY, lost);
+        this.tentGoal = lost > 1.0F;
+        this.updateTentaclesTo(Mth.clamp(lost / SlenderSanity.MAX, 0.0F, 1.0F));
+        this.faceToward(player.position(), 20.0F);
+        Vec3 eye = player.getEyePosition();
+        this.getLookControl().setLookAt(eye.x, eye.y, eye.z, 30.0F, 30.0F);
     }
 
     // ------------------------------------------------------------------ the original's logic (used when ORIGINAL_AI is true)
@@ -2308,11 +2281,5 @@ public class SlendermanEntity extends PathfinderMob {
         this.watchTicks = 0;
         this.farTicks = 0;
         
-        if (count >= SlenderPages.TOTAL && this.level instanceof ServerLevel) {
-            Player player = this.findTarget();
-            if (player != null && this.finalePhase == FINALE_NONE) {
-                this.startFinale(player);
-            }
-        }
     }
 }
