@@ -1571,11 +1571,12 @@ public class SlendermanEntity extends PathfinderMob {
     }
 
     /**
-     * The player is inside a structure / a building / a cave: there is a roof (not just leaves) within 12 blocks above his head.
+     * The player is inside a structure / a building / a cave: a roof within 12 blocks above his head AND walls around him (see Enclosure);
+     * a lone tree, a bridge or an overhang is not a structure.
      * Inside he does not walk, he teleports to spots he has worked out.
      */
     private boolean playerIndoors(Player player) {
-        return this.hasRoof(player.getX(), player.getEyeY(), player.getZ());
+        return Enclosure.isEnclosed(this.level, player.getX(), player.getEyeY(), player.getZ());
     }
 
     private boolean hasRoof(double x, double fromY, double z) {

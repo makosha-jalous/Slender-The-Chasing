@@ -300,7 +300,11 @@ public final class SlenderAmbience {
         if (topRoof == Integer.MIN_VALUE) return 0;
         int sky = level.getBrightness(LightLayer.SKY, new BlockPos(x, y, z));
         if (sky > 12) return 0;                 // an awning / porch: the sky is still right there
-        return (topRoof - y) > CAVE_DEPTH ? 2 : 1;
+        if ((topRoof - y) > CAVE_DEPTH) return 2;
+        // a roof alone is not a building: one block over the head (a tree, a bridge, an overhang) is still "outside";
+        // the walls are needed too (the same rule as for Slenderman, see Enclosure)
+        return com.example.slenderman.Enclosure.closedDirections(level, p.getX(), p.getEyeY(), p.getZ())
+                >= com.example.slenderman.Enclosure.WALLS_NEEDED ? 1 : 0;
     }
 
 }
