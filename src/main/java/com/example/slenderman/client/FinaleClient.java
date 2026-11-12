@@ -150,6 +150,19 @@ public final class FinaleClient {
         if (stage < SlenderFinale.STAGE_TURN || !(event.getNewScreen() instanceof net.minecraft.client.gui.screens.PauseScreen)) return;
         event.setCanceled(true);
         camera("pauseGlitch", null);
+        resumeSounds = true;          // Minecraft paused all the sounds for the pause we refused: they go on at the next tick
+    }
+
+    private static boolean resumeSounds;
+
+    @SubscribeEvent
+    public static void onTickResume(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END || !resumeSounds) return;
+        resumeSounds = false;
+        try {
+            Minecraft.getInstance().getSoundManager().resume();
+        } catch (Throwable ignored) {
+        }
     }
 
     // ------------------------------------------------------------------ the black screen
