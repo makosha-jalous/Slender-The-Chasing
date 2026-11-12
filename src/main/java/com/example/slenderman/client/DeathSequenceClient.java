@@ -106,6 +106,10 @@ public final class DeathSequenceClient {
     private static final float DEATH_LOSS = 30F;
     /** strength of the grain over the portrait: more transparent than before (0.40), because he is not always visible. */
     private static final float DEATH_NOISE = 0.30F;
+    /** the grain flashes in time with Static Heavy (the same dice): the strength while the sound is on / off. The scratches follow it. */
+    private static final float GRAIN_FLASH_ON = 1.7F, GRAIN_FLASH_OFF = 0.35F;
+    /** the colour split of the portrait is as strong as in the camera when the sanity is nearly gone (loss 100). */
+    private static final float DEATH_CHROMA_LOSS = 100F;
     private static boolean deathOn = false;
     private static float fishX = 0F, fishY = 0F;
     private static float glowFlick = 1.0F;
@@ -367,7 +371,7 @@ public final class DeathSequenceClient {
         float I = DEATH_LOSS;
         deathOn = diceAt(s) && I > 0F;
         if (deathOn) {
-            caNow = Mth.clamp(range(s, 2, 0.2F, 1.5F * I + 50F) / 200F, 0F, 1F);
+            caNow = Mth.clamp(range(s, 2, 0.2F, 1.5F * DEATH_CHROMA_LOSS + 50F) / 200F, 0F, 1F);
             if (rnd(s, 3) > 0.85F) {
                 fishY = range(s, 4, -0.01F * (100F - I), 0.005F * (100F - I));
             } else if (rnd(s, 5) > 0.75F) {
@@ -619,7 +623,7 @@ public final class DeathSequenceClient {
             drawPortrait(ps, w, h);
             if (coverOn) GuiComponent.fill(ps, 0, 0, w, h, 0xFF000000);      // the black screen covers the picture now and then
             // the grain of the camera at its strongest stage (20% weaker, with a flicker)
-            drawNoise(ps, w, h, DEATH_NOISE * (0.78F + 0.42F * FX_RND.nextFloat()));
+            drawNoise(ps, w, h, DEATH_NOISE * (deathOn ? GRAIN_FLASH_ON : GRAIN_FLASH_OFF) * (0.78F + 0.42F * FX_RND.nextFloat()));
             drawBentScene(ps, w, h, caNow);   // the fisheye and the colour split of the dice bend everything, the static too
             return;
         }
@@ -855,7 +859,7 @@ public final class DeathSequenceClient {
     /** strength of the camera grain against the old grain (1 = the same number as before). */
     private static final float DEATH_GRAIN_GAIN = 1.0F;
     /** strength of the scratches against the strength of the grain of the moment (they follow its flashes). */
-    private static final float DEATH_SCRATCH_GAIN = 1.5F;
+    private static final float DEATH_SCRATCH_GAIN = 0.6F;       // 60 % weaker than before (was 1.5)
     private static Boolean cameraGrain = null;
     private static float scratchU, scratchV, scratchDU, scratchDV, scratchOp = 1F, scratchFlick = 1F;
     private static long scratchUntil, scratchLast;

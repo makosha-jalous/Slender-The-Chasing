@@ -351,7 +351,8 @@ public class SlendermanModel extends EntityModel<SlendermanEntity> {
         // 0..1: slow bow with a sideways head tilt
         float bow = action == SlendermanEntity.ACTION_PEEK ? entity.getProgress(partial) : 0F;
         float side = entity.getActionSide();
-        float tent = entity.getTentacles(partial);
+        // the portrait of the death has no tentacles: he just stands there
+        float tent = DeathSequenceClient.isPortrait() ? 0F : entity.getTentacles(partial);
         float lookPitch = Mth.clamp(headPitch, -40F, 40F) * DEG;
 
         // ---------- slow stomping walk (only while he really walks; zero when he stands or acts) ----------
