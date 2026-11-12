@@ -264,10 +264,10 @@ public class SlendermanEntity extends PathfinderMob {
     private static final boolean UNFOCUSED_MAY_APPEAR_IN_VIEW = true;
     /** sight sounds of the original: one cooldown of 25 s, three distances. */
     private static final int SIGHT_COOLDOWN_TICKS = 20 * 25;
-    /** the screamer (the dramatic sound and its animation) only plays closer than this (the original has 15, too far for Minecraft). */
-    private static final double SIGHT_NEAR = 4.0D;
-    /** at this distance and closer he REACHES out with his hand; farther (up to SIGHT_NEAR) he slowly BOWS to the player. */
-    private static final double SCARE_REACH_DIST = 2.5D;
+    /** the screamer (the dramatic sound and its animation) only plays closer than this (8 blocks; the original has 15). */
+    private static final double SIGHT_NEAR = 8.0D;
+    /** from this distance (4 blocks) and closer he REACHES out with his hand (3 s); farther (4-8 blocks) he slowly BOWS to the player. */
+    private static final double SCARE_REACH_DIST = 4.0D;
     private static final double SIGHT_MIDDLE = 25.0D;
     private static final double SIGHT_FAR = 45.0D;
     /** the tentacles start to grow when 20 of 100 sanity is lost and are full at 100 lost. */
@@ -310,7 +310,7 @@ public class SlendermanEntity extends PathfinderMob {
     public static final int ACTION_LUNGE = 1;
     /** slow bow, played in front of the player like the reach (3 s). */
     public static final int ACTION_PEEK = 2;
-    public static final int LUNGE_TICKS = 20;
+    public static final int LUNGE_TICKS = 60;      // the reach lasts 3 s (the player must see that he really reached out)
     public static final int REACH_TICKS = 2;
     private static final int PEEK_TICKS = 60;
 
