@@ -214,7 +214,8 @@ public final class SlenderFinale {
         Vec3 sl = null;
         for (int i = 0; i < 24 && sl == null; i++) {
             double a = player.getRandom().nextDouble() * Math.PI * 2.0D;
-            sl = standSpot(level, to.x + Math.cos(a) * CHASE_DISTANCE, to.z + Math.sin(a) * CHASE_DISTANCE, to.y + 2.0D, 5);
+            double d = 3.0D + player.getRandom().nextDouble();                  // 3-4 blocks
+            sl = standSpot(level, to.x + Math.cos(a) * d, to.z + Math.sin(a) * d, to.y + 2.0D, 5);
         }
         if (sl == null) sl = new Vec3(to.x + CHASE_DISTANCE, to.y, to.z);
         float yaw = yawToward(sl, to);          // he is behind, the player looks the other way
@@ -235,24 +236,8 @@ public final class SlenderFinale {
         player.fallDistance = 0.0F;
         SlenderSanity.set(player, SlenderSanity.MAX);
 
-        net.minecraft.world.entity.Entity e = st.slender == null ? null : level.getEntity(st.slender);
-        Vec3 pos = player.position();
-        if (e != null) {
-            Vec3 dir = st.last == null ? Vec3.ZERO : new Vec3(pos.x - st.last.x, 0.0D, pos.z - st.last.z);
-            if (dir.lengthSqr() < 1.0E-4D) {
-                Vec3 look = player.getLookAngle();
-                dir = new Vec3(look.x, 0.0D, look.z);
-            }
-            if (dir.lengthSqr() > 1.0E-6D) {
-                dir = dir.normalize();
-                double x = pos.x - dir.x * CHASE_DISTANCE, z = pos.z - dir.z * CHASE_DISTANCE;
-                Vec3 spot = standSpot(level, x, z, pos.y + 2.0D, 6);
-                double y = spot != null ? spot.y : pos.y;
-                e.moveTo(x, y, z, yawToward(new Vec3(x, y, z), pos), 0.0F);
-                e.setDeltaMovement(Vec3.ZERO);
-            }
-        }
-        st.last = pos;
+        // he does NOT follow: he stands where the flash put him (3-4 blocks from the place of the teleport) until the next flash
+        st.last = player.position();
 
         if (--st.ticks > 0) return;
         if (st.run < st.runs) beginRun(player, st, false);

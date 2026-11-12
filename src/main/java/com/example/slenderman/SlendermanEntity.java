@@ -373,6 +373,8 @@ public class SlendermanEntity extends PathfinderMob {
     private boolean finaleMode = false;
     /** in the finale mode: true = the sanity of the player goes by the normal rule (right behind his back it falls without looking); false = it is set by the finale. */
     private boolean finaleRealSanity = false;
+    private boolean finaleScared = false;
+    private int finaleTurnTicks = 0;
     private int animCooldown = 0;
     private int idleTicks = 0;
     private Vec3 lastPlayerPos = null;
@@ -1226,6 +1228,14 @@ public class SlendermanEntity extends PathfinderMob {
 
     public void setFinaleRealSanity(boolean on) {
         this.finaleRealSanity = on;
+        this.finaleScared = false;
+        this.finaleTurnTicks = 0;
+    }
+
+    /** the screamer of the finale: ALWAYS one screamer sound and ALWAYS the reaching of the hand (no cooldowns, no chances). */
+    private void finaleScare() {
+        this.sendCue(1 + this.random.nextInt(SlendermanMod.SCREAMS.size()));
+        this.startAction(ACTION_LUNGE, LUNGE_TICKS);
     }
 
     /** in the finale mode: stands, looks at the player, the aggression is full and the tentacles grow with the sanity loss of the player. */
@@ -1233,6 +1243,22 @@ public class SlendermanEntity extends PathfinderMob {
         this.standStill();
         this.aggression = 1.0F;
         this.entityData.set(DATA_AGGRESSION, 1.0F);
+        if (this.finaleRealSanity && !this.finaleScared && this.action == ACTION_NONE
+                && (this.isSeenBy(player) || ++this.finaleTurnTicks > 60)) {
+            this.finaleScared = true;                      // the first moment the player sees him (or after 3 s at the latest)
+            this.finaleScare();
+        }
+        if (this.action == ACTION_LUNGE) {                 // the reach of the hand goes on its own timer
+            if (++this.actionTimer >= this.actionDuration) {
+                this.endAction();
+            } else {
+                float x = Math.min(1.0F, (float) this.actionTimer / (float) REACH_TICKS);
+                float inv = 1.0F - x;
+                float rise = 1.0F - inv * inv * inv;
+                float fall = Mth.clamp((float) (this.actionDuration - this.actionTimer) / 2.0F, 0.0F, 1.0F);
+                this.entityData.set(DATA_PROGRESS, rise * fall);
+            }
+        }
         if (this.finaleRealSanity) this.updateSanity(player, this.isSeenBy(player), this.distanceTo(player));
         float lost = SlenderSanity.get(player);
         this.entityData.set(DATA_SANITY, lost);
