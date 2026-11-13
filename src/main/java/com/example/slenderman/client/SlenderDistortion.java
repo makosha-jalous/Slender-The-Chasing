@@ -55,7 +55,7 @@ public final class SlenderDistortion {
     private static final long ROLL_MS = 16L;
     /** how far the rectangle reaches beyond his body (blocks, to the sides / up and down). */
     private static final double PAD_SIDE = 4.0D;        // much wider than his body, like the plane of the original (was 0.7)
-    private static final double PAD_UPDOWN = 2.0D;
+    private static final double PAD_UPDOWN = 1.0D;
     /** the waving sideways (share of the rectangle width). */
     private static final float WAVE = 0.06F;
     /** the shift of the colour channels (share of the rectangle width). */
@@ -69,7 +69,7 @@ public final class SlenderDistortion {
     private static final int FI = 12, FJ = 16;
     /** the original shader: strength (0.1..0.3, default 0.2) and transparency (0.01..0.1, default 0.05). */
     private static final float STRENGTH = 0.2F;
-    private static final float TRANSPARENCY = 0.05F;
+    private static final float TRANSPARENCY = 0.03F;
     /** how many times the noise texture repeats over the rectangle (the tiling of the original is not known). */
     private static final float NOISE_TILE_U = 1.0F;
     /** the waves are long vertical streaks, like in the original picture: the noise is finer from top to bottom. */
@@ -114,7 +114,7 @@ public final class SlenderDistortion {
 
     // ---- the mask in the world
     /** how far in front of him (towards the player) the plane stands (blocks); it never gets closer than 40% of the way to the player. */
-    private static final double MASK_OFFSET = 0.9D;
+    private static final double MASK_OFFSET = 0.7D;
     /** the plane reaches from below the ground (the depth test of the game cuts it at the ground) to this far above his head (blocks). */
     private static final double MASK_BELOW = 0.7D;
     private static final double MASK_ABOVE = 1.0D;
@@ -124,7 +124,7 @@ public final class SlenderDistortion {
     /** how many waves fit into the height of the plane (the old screen version had dozens: that was too many). */
     private static final float MASK_WAVES = 1.5F;
     /** how strong the bending of the plane is against the old screen version (the original bends the picture less: ghosts and ripples, not melting). */
-    private static final float MASK_AMOUNT = 0.30F;
+    private static final float MASK_AMOUNT = 0.50F;
 
     @Mod.EventBusSubscriber(modid = SlendermanMod.ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static final class Reg {
