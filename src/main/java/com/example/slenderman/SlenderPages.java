@@ -27,6 +27,10 @@ public final class SlenderPages {
     public static void collect(ServerPlayer player) {
         int count = Math.min(TOTAL, get(player) + 1);
         player.getPersistentData().putInt(KEY, count);
+        // the clock of the time stages (+1 stage every 5 minutes) starts with the FIRST page of this life
+        if (count == 1 || !player.getPersistentData().contains(SlendermanEntity.FIRST_PAGE_KEY)) {
+            player.getPersistentData().putLong(SlendermanEntity.FIRST_PAGE_KEY, player.level.getGameTime());
+        }
         SlenderNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new PagesCollectedMessage(count));
         // the 8th page: the NEW finale (sanity 0 at once, he is gone, a calm) - the old per-entity finale is not used then
         if (count >= TOTAL && SlenderFinale.ENABLED) {
@@ -73,12 +77,14 @@ public final class SlenderPages {
     /** a new life: no pages, no sanity loss (the client is told one second later by PageSyncEvents). */
     public static void clearForNewLife(Player player) {
         player.getPersistentData().putInt(KEY, 0);
+        player.getPersistentData().remove(SlendermanEntity.FIRST_PAGE_KEY);
         SlenderSanity.reset(player);
         SlenderFinale.clear(player);
     }
 
     public static void reset(ServerPlayer player) {
         player.getPersistentData().putInt(KEY, 0);
+        player.getPersistentData().remove(SlendermanEntity.FIRST_PAGE_KEY);
         SlenderSanity.reset(player);
         SlenderFinale.clear(player);
         sync(player);
