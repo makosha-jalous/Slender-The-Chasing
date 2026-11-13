@@ -48,6 +48,9 @@ public class SlendermanModel extends EntityModel<SlendermanEntity> {
     /** head tilts sideways towards the reaching (right) arm; negative = right side goes down. */
     private static final float REACH_HEAD_TILT = -0.30F;
 
+    /** the head tilt of the waiting mode (radians, about 12 degrees, to his right side). */
+    private static final float IDLE_HEAD_TILT = 0.22F;
+
     // ---- bow (slow, 3 s) ----
     private static final float BOW_LEAN = 0.40F;
     private static final float BOW_HEAD_TILT = 0.28F;
@@ -370,7 +373,10 @@ public class SlendermanModel extends EntityModel<SlendermanEntity> {
         // ---------- head: the torso lean is cancelled, so he keeps looking where he looked ----------
         head.yRot = Mth.clamp(netHeadYaw, -75F, 75F) * DEG;
         head.xRot = lookPitch - torso.xRot;
-        head.zRot = reach * REACH_HEAD_TILT + bow * side * BOW_HEAD_TILT - stride * 0.04F;
+        // the waiting tilt and the tilt of the reach are two separate animations (both to his right); the head follows the bigger one
+        float idleTilt = entity.getHeadTilt(partial) * IDLE_HEAD_TILT;
+        float tiltRad = Math.max(idleTilt, reach * -REACH_HEAD_TILT);
+        head.zRot = -tiltRad + bow * side * BOW_HEAD_TILT - stride * 0.04F;
 
         // ---------- legs: the knees bend sharply when a foot is lifted, then it stomps down ----------
         leftThigh.xRot = -stride * 0.50F - liftL * 0.30F;

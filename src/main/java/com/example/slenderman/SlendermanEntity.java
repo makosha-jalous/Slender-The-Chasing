@@ -42,6 +42,8 @@ import java.util.List;
 import java.util.UUID;
 
 public class SlendermanEntity extends PathfinderMob {
+    /** 0..1: the head tilted to his right side while he waits (a short animation of the waiting mode). */
+    private static final EntityDataAccessor<Float> DATA_TILT = SynchedEntityData.defineId(SlendermanEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_TENT = SynchedEntityData.defineId(SlendermanEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Integer> DATA_ACTION = SynchedEntityData.defineId(SlendermanEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Float> DATA_PROGRESS = SynchedEntityData.defineId(SlendermanEntity.class, EntityDataSerializers.FLOAT);
@@ -247,7 +249,10 @@ public class SlendermanEntity extends PathfinderMob {
     /** slow bow, played in front of the player like the reach (3 s). */
     public static final int ACTION_PEEK = 2;
     public static final int LUNGE_TICKS = 60;      // the reach lasts 3 s (the player must see that he really reached out)
-    public static final int REACH_TICKS = 2;
+    /** the reach: 0.5 s into the pose, a slow growth for the rest of the 3 s (LUNGE_TICKS), 0.5 s back to the normal stance. */
+    public static final int REACH_TICKS = 10;
+    /** how much of the full reach pose is reached in the first 0.5 s. */
+    private static final float REACH_FIRST = 0.7F;
     private static final int PEEK_TICKS = 60;
 
     /** he never walks; if the player is farther than this he jumps back to the player (any distance, no limit). */
@@ -255,7 +260,7 @@ public class SlendermanEntity extends PathfinderMob {
     /** ticks the player has to stay far away before he catches up (2 seconds). */
     private static final int FOLLOW_DELAY = 40;
 
-    private float tentPrev, tentNow, progPrev, progNow;
+    private float tentPrev, tentNow, progPrev, progNow, tiltPrev, tiltNow;
     private int action, actionTimer, actionDuration;
     private int vanishCooldown = 20 * 15 + this.random.nextInt(20 * 16); // 15-30 sec
     private int vanishTicks = 0;
@@ -368,6 +373,7 @@ public class SlendermanEntity extends PathfinderMob {
     protected void defineSynchedData() {
         super.defineSynchedData();
         this.entityData.define(DATA_TENT, 0.0F);
+        this.entityData.define(DATA_TILT, 0.0F);
         this.entityData.define(DATA_ACTION, 0);
         this.entityData.define(DATA_PROGRESS, 0.0F);
         this.entityData.define(DATA_SIDE, 1);
@@ -418,6 +424,8 @@ public class SlendermanEntity extends PathfinderMob {
         return Mth.lerp(partial, progPrev, progNow);
     }
 
+    public float getHeadTilt(float partial) { return Mth.lerp(partial, tiltPrev, tiltNow); }
+
     public float getTentacles(float partial) { return Mth.lerp(partial, tentPrev, tentNow); }
 
     @Override
@@ -426,6 +434,8 @@ public class SlendermanEntity extends PathfinderMob {
         if (this.level.isClientSide) {
             tentPrev = tentNow;
             tentNow = this.entityData.get(DATA_TENT);
+            tiltPrev = tiltNow;
+            tiltNow = this.entityData.get(DATA_TILT);
             progPrev = progNow;
             progNow = this.entityData.get(DATA_PROGRESS);
             DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> com.example.slenderman.client.SlendermanRoamingSound.clientTick(this));
@@ -643,6 +653,7 @@ public class SlendermanEntity extends PathfinderMob {
 
         // ---- running animation ----
         if (this.action != ACTION_NONE) {
+            this.updateHeadTilt(seen, false);
             this.actionTimer++;
             float progress;
             if (this.action == ACTION_LUNGE) {
@@ -650,16 +661,8 @@ public class SlendermanEntity extends PathfinderMob {
                     this.endAction();
                     return;
                 }
-                // very sharp shoot-up (about 2 ticks), hold, then an equally sharp drop at the end
-                float x = Math.min(1.0F, (float) this.actionTimer / (float) REACH_TICKS);
-                float inv = 1.0F - x;
-                float rise = 1.0F - inv * inv * inv;
-                float fall = Mth.clamp((float) (this.actionDuration - this.actionTimer) / 2.0F, 0.0F, 1.0F);
-                progress = rise * fall;
-                this.faceToward(player.position(), 40.0F);
-                // only the pitch matters: the model keeps the head looking at the player's eyes
-                Vec3 eye = player.getEyePosition();
-                this.getLookControl().setLookAt(eye.x, eye.y, eye.z, 40.0F, 40.0F);
+                // 1 s smooth rise (the arm and the torso go together), a hold, 1 s smooth return; he does NOT turn to the player
+                progress = reachProgress(this.actionTimer, this.actionDuration);
             } else {
                 if (this.actionTimer >= this.actionDuration) {
                     this.endAction(); // snaps back to the normal pose at once
@@ -668,7 +671,6 @@ public class SlendermanEntity extends PathfinderMob {
                 // slow, smooth bow that keeps growing until the very end
                 float frac = (float) this.actionTimer / (float) this.actionDuration;
                 progress = frac * frac * (3.0F - 2.0F * frac);
-                this.faceToward(player.position(), 30.0F);
             }
             this.entityData.set(DATA_PROGRESS, progress);
             this.standStill();
@@ -724,6 +726,7 @@ public class SlendermanEntity extends PathfinderMob {
             Vec3 eye = player.getEyePosition();
             this.getLookControl().setLookAt(eye.x, eye.y, eye.z, 60.0F, 60.0F);
         }
+        this.updateHeadTilt(seen, walking);
         if (!walking) {
             this.standStill();
         }
@@ -835,6 +838,54 @@ public class SlendermanEntity extends PathfinderMob {
         }
         this.setYHeadRot(this.yBodyRot);
         this.walkToward(player.getX(), player.getY(), player.getZ(), 1.2D);
+    }
+
+    /**
+     * 0..1 of the reach at a tick of the action (the torso, the head and the arm follow it together): in the first 0.5 s he gets into the pose
+     * (REACH_FIRST of it), then for the rest of the 3 s he slowly goes on (leans, tilts the head, stretches the arm) up to the full pose,
+     * and in the last 0.5 s he goes back to the normal stance.
+     */
+    private static float reachProgress(int timer, int duration) {
+        float up = Mth.clamp((float) timer / (float) REACH_TICKS, 0.0F, 1.0F);
+        float p;
+        if (timer < REACH_TICKS) {
+            p = REACH_FIRST * (up * up * (3.0F - 2.0F * up));
+        } else {
+            float slow = Mth.clamp((float) (timer - REACH_TICKS) / (float) Math.max(1, duration - 2 * REACH_TICKS), 0.0F, 1.0F);
+            p = REACH_FIRST + (1.0F - REACH_FIRST) * slow;
+        }
+        float down = Mth.clamp((float) (duration - timer) / (float) REACH_TICKS, 0.0F, 1.0F);
+        return p * (down * down * (3.0F - 2.0F * down));
+    }
+
+    // ---- the head tilt of the waiting mode ----
+    private static final float TILT_CHANCE = 0.5F;       // one roll per "standing": about half of the waits end with a tilted head
+    private static final int TILT_TICKS = 10;            // the tilt takes 0.5 s
+    private boolean tiltGoal, tiltRolled;
+    private int tiltWait, tiltDelay = 40;
+    private Vec3 tiltSpot;
+
+    /**
+     * Waiting mode: he stands somewhere and nobody looks at him. Once per standing (1-4 s after he stands, only while he is NOT seen)
+     * there is a 50 % chance that he leans his head to his right side, in 0.5 s. He keeps it so (also while he is seen)
+     * until he moves away (a teleport, a walk): then the head comes back in 0.5 s. It has nothing to do with the reach.
+     */
+    private void updateHeadTilt(boolean seen, boolean walking) {
+        if (this.tiltSpot == null || this.position().distanceToSqr(this.tiltSpot) > 2.25D || walking || this.vanished) {
+            this.tiltSpot = this.position();
+            this.tiltGoal = false;
+            this.tiltRolled = false;
+            this.tiltWait = 0;
+            this.tiltDelay = 20 + this.random.nextInt(61);
+        } else if (!this.tiltRolled && this.action == ACTION_NONE && !seen && this.wideUnseen >= MOVE_GRACE_TICKS) {
+            if (++this.tiltWait >= this.tiltDelay) {
+                this.tiltRolled = true;
+                this.tiltGoal = this.random.nextFloat() < TILT_CHANCE;
+            }
+        }
+        float tilt = this.entityData.get(DATA_TILT);
+        float next = Mth.clamp(tilt + (this.tiltGoal ? 1.0F : -1.0F) / (float) TILT_TICKS, 0.0F, 1.0F);
+        if (next != tilt) this.entityData.set(DATA_TILT, next);
     }
 
     private void startAction(int newAction, int duration) {
@@ -967,11 +1018,7 @@ public class SlendermanEntity extends PathfinderMob {
             if (++this.actionTimer >= this.actionDuration) {
                 this.endAction();
             } else {
-                float x = Math.min(1.0F, (float) this.actionTimer / (float) REACH_TICKS);
-                float inv = 1.0F - x;
-                float rise = 1.0F - inv * inv * inv;
-                float fall = Mth.clamp((float) (this.actionDuration - this.actionTimer) / 2.0F, 0.0F, 1.0F);
-                this.entityData.set(DATA_PROGRESS, rise * fall);
+                this.entityData.set(DATA_PROGRESS, reachProgress(this.actionTimer, this.actionDuration));
             }
         }
         if (this.finaleRealSanity) this.updateSanity(player, this.isSeenBy(player), this.distanceTo(player));
