@@ -239,7 +239,6 @@ public class SlendermanEntity extends PathfinderMob {
     private static final double SANITY_MAX_DIST = 64.0D;
     /** at 100 he is in "kill" mode until the sanity has fallen below this. */
     private static final float SANITY_RUSH_OFF = 50.0F;
-    private static final double SANITY_HIT_RANGE = 3.2D;
     private static final float SANITY_KILL_DAMAGE = 10000.0F;
     // ---- animations ----
     public static final int ACTION_NONE = 0;
@@ -315,7 +314,6 @@ public class SlendermanEntity extends PathfinderMob {
     private double moveX = 0.0D, moveZ = 0.0D;
     private int sanityDelay = 0;
     private boolean sanityRush = false;
-    private int rushTicks = 0;
     private int rushGrace = 10;
     private int tpSeq = 0;
     private boolean suppressTeleportCue = false;
@@ -1335,27 +1333,19 @@ public class SlendermanEntity extends PathfinderMob {
         else if (value <= SANITY_RUSH_OFF) this.sanityRush = false;
     }
 
-    /** sanity is at 100: he appears right next to the player and kills him with one hit. */
+    /**
+     * Sanity is at 100: the player dies at once, WHEREVER he stands (as in the original: the sanity is lost while the player
+     * looks at him, also from far away; he does not have to come closer). Only the death scene starts: the black screen, the portrait, the hit.
+     */
     private void sanityKill(Player player, double dist) {
         this.vanished = false;
         this.setInvisible(false);
         this.standStill();
-        if (dist > SANITY_HIT_RANGE) {
-            this.rushGrace = 10;
-            if (++this.rushTicks >= 10) {
-                this.rushTicks = 0;
-                if (!this.teleportNear(player, TeleportKind.CLOSE)) {
-                    this.teleportNear(player, TeleportKind.HUNT);
-                }
-            }
-            return;
-        }
-        this.faceToward(player.position(), 90.0F);
-        if (!this.hasClearLine(player)) return;
         if (this.rushGrace > 0) {
             this.rushGrace--;
             return;
         }
+        this.faceToward(player.position(), 90.0F);
         this.beginDeath(player, false);   // 2 s of black screen, then the hit
     }
 
