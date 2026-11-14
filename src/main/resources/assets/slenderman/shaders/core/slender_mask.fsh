@@ -43,7 +43,7 @@ void main() {
 
     // the waves are NOT the same everywhere: bands along the height with a different amplitude, a different stretch (frequency)
     float band = vnoise(vec2(uv.y * 2.2 + seed * 3.0, t * 0.7 + seed));
-    float amp = 0.40 + 1.50 * band * band;
+    float amp = 0.50 + 1.00 * band * band;           // every wave has its own size, but none of them tears the picture apart
     float freq = mix(Wave.z, Wave.z * WAVE_STRETCH, st);
     float sx = vnoise(vec2(uv.y * freq + t * WAVE_SPEED + seed * 5.0, uv.x * 1.2 - t * 0.5))
              + vnoise(vec2(uv.y * freq * 1.6 - t * WAVE_SPEED * 1.5, uv.x * 2.6 + seed * 3.0)) - 1.0;
