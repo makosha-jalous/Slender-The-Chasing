@@ -249,9 +249,12 @@ public class SlendermanEntity extends PathfinderMob {
     /** slow bow, played in front of the player like the reach (3 s). */
     public static final int ACTION_PEEK = 2;
     public static final int LUNGE_TICKS = 60;      // the reach lasts 3 s (the player must see that he really reached out)
-    /** the reach: 0.5 s into the pose, a slow growth for the rest of the 3 s (LUNGE_TICKS), 0.5 s back to the normal stance. */
-    public static final int REACH_TICKS = 10;
-    /** how much of the full reach pose is reached in the first 0.5 s. */
+    /**
+     * the reach: a SHARP jump into the pose, a slow growth for the rest of the 3 s (LUNGE_TICKS), a sharp jump back to the normal stance.
+     * 60 ms is a little more than one game tick (50 ms), so the jump is one tick; the client smooths it between the two ticks.
+     */
+    public static final int REACH_TICKS = 1;
+    /** how much of the full reach pose is reached by the first sharp jump. */
     private static final float REACH_FIRST = 0.7F;
     private static final int PEEK_TICKS = 60;
 
@@ -841,9 +844,9 @@ public class SlendermanEntity extends PathfinderMob {
     }
 
     /**
-     * 0..1 of the reach at a tick of the action (the torso, the head and the arm follow it together): in the first 0.5 s he gets into the pose
+     * 0..1 of the reach at a tick of the action (the torso, the head and the arm follow it together): in the first moment (60 ms) he jumps into the pose
      * (REACH_FIRST of it), then for the rest of the 3 s he slowly goes on (leans, tilts the head, stretches the arm) up to the full pose,
-     * and in the last 0.5 s he goes back to the normal stance.
+     * and in the last moment (60 ms) he jumps back to the normal stance.
      */
     private static float reachProgress(int timer, int duration) {
         float up = Mth.clamp((float) timer / (float) REACH_TICKS, 0.0F, 1.0F);
