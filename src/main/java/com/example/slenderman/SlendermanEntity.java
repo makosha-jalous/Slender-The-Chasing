@@ -103,7 +103,7 @@ public class SlendermanEntity extends PathfinderMob {
 
     // ---- aggression stages: one per collected page (index = pages, 1..8; index 0 is never used) ----
     // 1-2 pages: a watcher 20-25 blocks away, never attacks | 3-4: stalks 13-17 blocks away, steps into the way when the player runs
-    // 5-6: hunter 8-10 blocks away, appears in front of the player | 7: open hunt 5-7 blocks away, steps into the way (50 %)
+    // 5-6: hunter 7-9 / 5-7 blocks away, appears in front of the player | 7: open hunt 3-5 blocks away, steps into the way (50 %)
     // 8: the finale (he is gone for 10 s, then stands behind the player, then disappears)
     //                                                     0     1     2     3     4     5     6     7     8
     /** the distance he keeps to the player while stalking (blocks). */
@@ -137,9 +137,12 @@ public class SlendermanEntity extends PathfinderMob {
     private static final double CONTACT_DIST = 1.6D;
     /** no teleport ever puts him closer than this to the player (blocks, horizontal): the hitboxes must never touch by a teleport. */
     private static final double TELEPORT_MIN_DIST = 1.1D;
-    /** the distance band he keeps while stalking (blocks), index = pages collected: pages 1-2: 30-35, 3: 13-17, 4: 10-13, 5: 6-7, 6: 4-6, 7: 2-4. */
-    private static final double[] BAND_MIN = {30.0, 30.0, 30.0, 13.0, 10.0,  6.0,  4.0,  2.0,  3.0};
-    private static final double[] BAND_MAX = {35.0, 35.0, 35.0, 17.0, 13.0, 7.0, 6.0,  4.0,  4.0};  
+    /** the distance band he keeps while stalking (blocks), index = pages collected: pages 1-2: 30-35, 3: 13-17, 4: 10-13, 5: 7-9, 6: 5-7, 7: 3-5. */
+    private static final double[] BAND_MIN = {30.0, 30.0, 30.0, 13.0, 10.0,  7.0,  5.0,  3.0,  3.0};
+    private static final double[] BAND_MAX = {35.0, 35.0, 35.0, 17.0, 13.0,  9.0,  7.0,  5.0,  4.0};
+    /** the START distance (the page-1 band), kept apart and never changed: the angry teleport takes an eighth of it (as the original's minRangeCache / maxRangeCache). */
+    private static final double START_MIN = 30.0D;
+    private static final double START_MAX = 35.0D;
     private static final int REPOSITION_TICKS = 80;
     private static final double REPOSITION_STEP = 12.0D;
 
@@ -199,7 +202,7 @@ public class SlendermanEntity extends PathfinderMob {
     private static final double BLOCKS_PER_TICK_AT_ONE = 0.12D * 2.158D;
     /** "angry" (4 sightings) or the player is inside a structure (50 %): the teleport distance is an eighth of the page distance ... */
     private static final double NEAR_DIVISOR = 8.0D;
-    /** ... but never closer than this (the original's eighth would put him inside the player on the late pages). */
+    /** (not used any more: the angry teleport now takes an eighth of the fixed start distance). */
     private static final double NEAR_MIN_DIST = 3.0D;
     /** true = as in the original: only a FOCUSED flashlight stops him from appearing in view before page 6; false = he never appears in view. */
     private static final boolean UNFOCUSED_MAY_APPEAR_IN_VIEW = true;
@@ -1101,7 +1104,7 @@ public class SlendermanEntity extends PathfinderMob {
 
     /**
      * CalculateMove(2): he appears at a random angle around the player at a distance of the page band (BAND_MIN..BAND_MAX).
-     * "Angry" (4 sightings) or the player inside a structure (50 %): an eighth of that distance (never closer than NEAR_MIN_DIST).
+     * "Angry" (4 sightings) or the player inside a structure (50 %): an eighth of the START distance (START_MIN..START_MAX), the same on every page.
      * Before page 6 a FOCUSED flashlight only lets him appear where the player cannot see him; if that fails, he appears
      * behind the player (the side away from him), like the original's retry.
      */
@@ -1111,8 +1114,9 @@ public class SlendermanEntity extends PathfinderMob {
         double hi = BAND_MAX[st];
         boolean near = this.angry || (indoors && this.random.nextFloat() > 0.5F);
         if (near) {
-            lo = Math.max(NEAR_MIN_DIST, lo / NEAR_DIVISOR);
-            hi = Math.max(lo + 0.8D, hi / NEAR_DIVISOR);
+            // the same on every page: an eighth of the START distance (30-35 / 8 = 3.75 - 4.4 blocks)
+            lo = START_MIN / NEAR_DIVISOR;
+            hi = START_MAX / NEAR_DIVISOR;
         }
         boolean needHidden = st + LEVEL < OPEN_TELEPORT_STAGE
                 && (!UNFOCUSED_MAY_APPEAR_IN_VIEW || FlashlightLink.isOnAndFocused(player));
