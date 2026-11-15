@@ -124,7 +124,7 @@ public final class SlenderDistortion {
     /** how many waves fit into the height of the plane (the old screen version had dozens: that was too many). */
     private static final float MASK_WAVES = 1.5F;
     /** how strong the bending of the plane is against the old screen version (the original bends the picture less: ghosts and ripples, not melting). */
-    private static final float MASK_AMOUNT = 0.25F;
+    private static final float MASK_AMOUNT = 0.40F;
 
     @Mod.EventBusSubscriber(modid = SlendermanMod.ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static final class Reg {
@@ -246,9 +246,11 @@ public final class SlenderDistortion {
         // does not depend on where the player looks or stands. Come closer to him than that and you walk through it: it is gone.
         double dx = cam.x - ip.x, dz = cam.z - ip.z;
         if (Math.sqrt(dx * dx + dz * dz) < MASK_OFFSET) return;
-        float yaw = Mth.rotLerp(pt, s.yBodyRotO, s.yBodyRot) * 0.017453292F;
-        double nx = -Math.sin(yaw), nz = Math.cos(yaw);       // the way he faces
-        double rx = nz, rz = -nx;                             // along the plane (to the side of him)
+        // the plane stands on the line between him and the camera and is turned to the camera (around the vertical axis only), so it is
+        // always seen from the front, whichever way his body is turned (a plane fixed to his facing was seen from the side = invisible)
+        double dl = Math.sqrt(dx * dx + dz * dz);
+        double nx = dx / dl, nz = dz / dl;                    // from him to the camera
+        double rx = nz, rz = -nx;                             // along the plane (to the side)
         double off = MASK_OFFSET;
         double hw = 0.3D + PAD_SIDE;
         double y0 = ip.y - MASK_BELOW, y1 = ip.y + s.getBbHeight() + MASK_ABOVE;
