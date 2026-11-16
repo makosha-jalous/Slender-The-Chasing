@@ -48,6 +48,39 @@ public class SlendermanModel extends EntityModel<SlendermanEntity> {
     /** head tilts sideways towards the reaching (right) arm; negative = right side goes down. */
     private static final float REACH_HEAD_TILT = -0.30F;
 
+    // ---- the walk ----
+    /** torso + head lean forward (radians, ~12 degrees). */
+    private static final float WALK_LEAN = 0.21F;
+    /** the torso turns this far to each side (radians, ~16 degrees). */
+    private static final float WALK_TORSO_YAW = 0.28F;
+    /** the arms swing this far (radians, ~34 degrees). */
+    private static final float WALK_ARM = 0.60F;
+    /** the extra bend of the forearm at the top of the swing (radians). */
+    private static final float WALK_ELBOW = 0.45F;
+    /** the thigh goes this far forward / back (radians, ~26 degrees) and the knee bends this much at most (radians, ~52 degrees). */
+    private static final float WALK_STEP = 0.45F;
+    private static final float WALK_KNEE = 0.90F;
+
+    /** how far FORWARD the thigh is (+ forward) at this phase of the leg: the first half = the step (back to forward), the second = straight, going back. */
+    private static float legSwing(float phase) {
+        float h = phase % (2F * Mth.PI);
+        if (h < 0F) h += 2F * Mth.PI;
+        if (h < Mth.PI) {
+            float u = h / Mth.PI;
+            u = u * u * (3F - 2F * u);
+            return Mth.lerp(u, -WALK_STEP, WALK_STEP);
+        }
+        float u = (h - Mth.PI) / Mth.PI;
+        return Mth.lerp(u, WALK_STEP, -WALK_STEP);
+    }
+
+    /** the bend of the knee: only during the step, straight at both ends of it. */
+    private static float legKnee(float phase) {
+        float h = phase % (2F * Mth.PI);
+        if (h < 0F) h += 2F * Mth.PI;
+        return h < Mth.PI ? WALK_KNEE * Mth.sin(h) : 0F;
+    }
+
     /** the head tilt of the waiting mode (radians, about 12 degrees, to his right side). */
     private static final float IDLE_HEAD_TILT = 0.22F;
 
@@ -484,42 +517,47 @@ public class SlendermanModel extends EntityModel<SlendermanEntity> {
         float tent = DeathSequenceClient.isPortrait() ? 0F : entity.getTentacles(partial);
         float lookPitch = Mth.clamp(headPitch, -40F, 40F) * DEG;
 
-        // ---------- slow stomping walk (only while he really walks; zero when he stands or acts) ----------
-        float amp = Mth.clamp(limbSwingAmount * 1.8F, 0F, 1F) * (1F - Math.max(reach, bow));
-        float phase = limbSwing * 0.35F;                          // slow: one full stride takes about 2 s
-        float stride = Mth.cos(phase) * amp;                      // -1..1, left leg forward when positive
-        float liftL = Math.max(0F, -Mth.sin(phase)) * amp;       // left leg is being lifted (knee bent)
-        float liftR = Math.max(0F, Mth.sin(phase)) * amp;        // right leg is being lifted
+        // ---------- the walk (only while he really walks; fades in and out in 300 ms, zero when he stands or acts) ----------
+        // One full cycle = 1 s: 500 ms the torso turns to his right and the RIGHT arm comes forward while the LEFT leg steps,
+        // 500 ms the torso turns to his left and the LEFT arm comes forward while the RIGHT leg steps. The head does not move with the torso.
+        float walk = entity.getWalkAnim(partial) * (1F - Math.max(reach, bow));
+        float ph = ageInTicks * (Mth.PI / 10F);                   // 20 ticks = 1 s = one full cycle
+        float sRaw = Mth.sin(ph);
+        float s = sRaw * walk;                                    // + = torso right and right arm forward, - = torso left and left arm forward
+        float lean = WALK_LEAN * walk;                            // the hunch: torso and head a little forward
 
-        // ---------- torso: dead still when standing, bends forward for reach / bow, sways while he walks ----------
-        torso.xRot = reach * REACH_LEAN + bow * BOW_LEAN + amp * 0.05F;
-        torso.yRot = stride * 0.06F;
-        torso.zRot = stride * 0.07F;
+        // ---------- torso: dead still when standing, bends forward for reach / bow, hunched and turning while he walks ----------
+        torso.xRot = reach * REACH_LEAN + bow * BOW_LEAN + lean;
+        torso.yRot = s * WALK_TORSO_YAW;
+        torso.zRot = 0F;
 
-        // ---------- head: the torso lean is cancelled, so he keeps looking where he looked ----------
-        head.yRot = Mth.clamp(netHeadYaw, -75F, 75F) * DEG;
-        head.xRot = lookPitch - torso.xRot;
+        // ---------- head: the turning of the torso is cancelled (it keeps looking where he looked); the hunch goes with the torso ----------
+        head.yRot = Mth.clamp(netHeadYaw, -75F, 75F) * DEG - torso.yRot;
+        head.xRot = lookPitch - (torso.xRot - lean);
         // the waiting tilt and the tilt of the reach are two separate animations (both to his right); the head follows the bigger one
         float idleTilt = entity.getHeadTilt(partial) * IDLE_HEAD_TILT;
         float tiltRad = Math.max(idleTilt, reach * -REACH_HEAD_TILT);
-        head.zRot = -tiltRad + bow * side * BOW_HEAD_TILT - stride * 0.04F;
+        head.zRot = -tiltRad + bow * side * BOW_HEAD_TILT;
 
-        // ---------- legs: the knees bend sharply when a foot is lifted, then it stomps down ----------
-        leftThigh.xRot = -stride * 0.50F - liftL * 0.30F;
-        rightThigh.xRot = stride * 0.50F - liftR * 0.30F;
-        leftShin.xRot = liftL * 1.0F;
-        rightShin.xRot = liftR * 1.0F;
+        // ---------- legs: a step = the knee bends and the leg goes forward (500 ms), then it is straight and goes back (500 ms) ----------
+        float swingL = legSwing(ph) * walk, swingR = legSwing(ph + Mth.PI) * walk;
+        leftThigh.xRot = -swingL;
+        rightThigh.xRot = -swingR;
+        leftShin.xRot = legKnee(ph) * walk;
+        rightShin.xRot = legKnee(ph + Mth.PI) * walk;
 
-        // ---------- arms: straight down, a hair away from the body, elbows slightly bent ----------
-        // arms swing in turns, opposite to the legs
-        leftArm.xRot = stride * 0.30F;
-        rightArm.xRot = -stride * 0.30F;
+        // ---------- arms: they hang down (against the hunch), the one on the side of the turn comes forward and goes back ----------
+        // (they sit on the torso, so they turn together with it around the vertical axis)
+        leftArm.xRot = s * WALK_ARM - lean * 0.9F;
+        rightArm.xRot = -s * WALK_ARM - lean * 0.9F;
         leftArm.yRot = 0F;
         rightArm.yRot = 0F;
         leftArm.zRot = -0.03F;
         rightArm.zRot = 0.03F;
-        leftForearm.xRot = REST_ELBOW - Math.max(0F, -stride) * 0.25F;
-        rightForearm.xRot = REST_ELBOW - Math.max(0F, stride) * 0.25F;
+        // the forearm bends a little forward at the top point of the arm
+        float topR = Math.max(0F, sRaw), topL = Math.max(0F, -sRaw);
+        leftForearm.xRot = REST_ELBOW - topL * topL * WALK_ELBOW * walk;
+        rightForearm.xRot = REST_ELBOW - topR * topR * WALK_ELBOW * walk;
         leftHand.xRot = 0F;
         rightHand.xRot = 0F;
 

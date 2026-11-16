@@ -21,6 +21,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ChunkPos;
@@ -375,6 +376,67 @@ public class SlendermanEntity extends PathfinderMob {
         this.maxUpStep = 1.5F;
         this.xpReward = 0;
         this.setPersistenceRequired();
+        this.moveControl = new SlenderMoveControl(this);
+    }
+
+    /** true while he walks up to the player (originalWalk): the body keeps facing the player and he moves SIDEWAYS along the path (never turned along the zigzags). */
+    private boolean strafeWalking;
+    /** the walking animation, 0..1: grows and dies away in 300 ms (6 ticks); the model reads it. */
+    private float walkAnim, walkAnimO;
+    private static final float WALK_ANIM_STEP = 1.0F / 6.0F;
+    /** how fast the body turns to the player while he walks (degrees per tick): smooth, never a snap. */
+    private static final float WALK_TURN_DEG = 12.0F;
+
+    public float getWalkAnim(float partial) { return Mth.lerp(partial, walkAnimO, walkAnim); }
+
+    /**
+     * The movement of the vanilla mob, except that while strafeWalking he does NOT turn to the way he goes: the wanted point is
+     * converted into "forward" and "sideways" relative to where he faces (the body keeps looking at the player).
+     */
+    private static final class SlenderMoveControl extends MoveControl {
+        private final SlendermanEntity slender;
+
+        SlenderMoveControl(SlendermanEntity mob) {
+            super(mob);
+            this.slender = mob;
+        }
+
+        @Override
+        public void tick() {
+            if (!this.slender.strafeWalking || this.operation != MoveControl.Operation.MOVE_TO) {
+                super.tick();
+                return;
+            }
+            this.operation = MoveControl.Operation.WAIT;
+            double dx = this.wantedX - this.mob.getX();
+            double dz = this.wantedZ - this.mob.getZ();
+            double dy = this.wantedY - this.mob.getY();
+            if (dx * dx + dy * dy + dz * dz < 2.5000003E-7D) {
+                this.mob.setZza(0.0F);
+                this.mob.setXxa(0.0F);
+                return;
+            }
+            double len = Math.sqrt(dx * dx + dz * dz);
+            this.mob.setSpeed((float) (this.speedModifier * this.mob.getAttributeValue(Attributes.MOVEMENT_SPEED)));
+            if (len > 1.0E-6D) {
+                double ux = dx / len, uz = dz / len;
+                float yaw = this.mob.getYRot() * 0.017453292F;
+                double sin = Math.sin(yaw), cos = Math.cos(yaw);
+                // vanilla: forward = (-sin, cos), right-left axis = (cos, sin)
+                this.mob.setZza((float) (-ux * sin + uz * cos));
+                this.mob.setXxa((float) (ux * cos + uz * sin));
+            }
+            // the same jump as the vanilla mob: a step higher than he can climb right in front of him
+            net.minecraft.core.BlockPos pos = this.mob.blockPosition();
+            net.minecraft.world.level.block.state.BlockState state = this.mob.level.getBlockState(pos);
+            net.minecraft.world.phys.shapes.VoxelShape shape = state.getCollisionShape(this.mob.level, pos);
+            if (dy > (double) this.mob.maxUpStep && dx * dx + dz * dz < (double) Math.max(1.0F, this.mob.getBbWidth())
+                    || !shape.isEmpty() && this.mob.getY() < shape.max(net.minecraft.core.Direction.Axis.Y) + (double) pos.getY()
+                    && !state.is(net.minecraft.tags.BlockTags.DOORS) && !state.is(net.minecraft.tags.BlockTags.FENCES)) {
+                this.mob.getJumpControl().jump();
+                this.operation = MoveControl.Operation.JUMPING;
+            }
+        }
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -446,6 +508,10 @@ public class SlendermanEntity extends PathfinderMob {
     @Override
     public void tick() {
         super.tick();
+        // the walking animation fades in / out in 300 ms (he moved this tick = he walks)
+        this.walkAnimO = this.walkAnim;
+        boolean moved = Math.hypot(this.getX() - this.xo, this.getZ() - this.zo) > 0.02D;
+        this.walkAnim += Mth.clamp((moved ? 1.0F : 0.0F) - this.walkAnim, -WALK_ANIM_STEP, WALK_ANIM_STEP);
         if (this.level.isClientSide) {
             tentPrev = tentNow;
             tentNow = this.entityData.get(DATA_TENT);
@@ -556,6 +622,7 @@ public class SlendermanEntity extends PathfinderMob {
     @Override
     protected void customServerAiStep() {
         super.customServerAiStep();
+        this.strafeWalking = false;
         this.keepChunkLoaded();
 
         // ---- death scene running: nothing else matters ----
@@ -1230,6 +1297,9 @@ public class SlendermanEntity extends PathfinderMob {
         if (closeIn) blocksPerSecond = this.playerSpeed * 20.0D >= SPRINT_BPS ? Math.min(blocksPerSecond, CLOSE_IN_RUN_BPS) : Math.max(blocksPerSecond, CLOSE_IN_FAST_BPS);
         double mul = blocksPerSecond / 20.0D / BLOCKS_PER_TICK_AT_ONE;
         Vec3 goal = player.position();
+        // the body and the head turn smoothly to the player all the time; he walks straight at the player and goes around things SIDEWAYS
+        this.faceToward(player.position(), WALK_TURN_DEG);
+        this.strafeWalking = true;
         this.walkToward(goal.x, goal.y, goal.z, mul);
         this.watchProgress(player, dist, CATCH_DIST);
         return true;
