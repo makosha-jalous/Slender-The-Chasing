@@ -102,7 +102,7 @@ public final class SlenderDistortion {
     private static final float EXPOSE_CONTRAST = 5.0F;
     private static final float EXPOSE_BRIGHT = 1.5F;
     /** near him (full strength of the burst) the bending and the colour split grow to these values (the video of the original). */
-    private static final float NEAR_DISPLACE_GAIN = 1.5F;
+    private static final float NEAR_DISPLACE_GAIN = 5.0F;
     private static final float NEAR_CA_SHIFT = 0.0F;
     /** the same, only light, for the case the small shader could not be loaded. */
     private static final float EXPOSE_LIGHT = 0.55F;
@@ -113,8 +113,8 @@ public final class SlenderDistortion {
     private static ShaderInstance mask;
 
     // ---- the mask in the world
-    /** how far in front of him (the way he faces) the plane stands (blocks); the player closer to him than this is inside the plane's circle and does not see it. */
-    private static final double MASK_OFFSET = 1.0D;
+    /** how far in front of him (towards the player) the plane stands (blocks); it never gets closer than 40% of the way to the player. */
+    private static final double MASK_OFFSET = 0.7D;
     /** the plane reaches from below the ground (the depth test of the game cuts it at the ground) to this far above his head (blocks). */
     private static final double MASK_BELOW = 0.7D;
     private static final double MASK_ABOVE = 1.0D;
@@ -124,7 +124,7 @@ public final class SlenderDistortion {
     /** how many waves fit into the height of the plane (the old screen version had dozens: that was too many). */
     private static final float MASK_WAVES = 1.5F;
     /** how strong the bending of the plane is against the old screen version (the original bends the picture less: ghosts and ripples, not melting). */
-    private static final float MASK_AMOUNT = 1.0F;
+    private static final float MASK_AMOUNT = 0.50F;
 
     @Mod.EventBusSubscriber(modid = SlendermanMod.ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static final class Reg {
@@ -212,8 +212,33 @@ public final class SlenderDistortion {
         }
     }
 
-    // The old screen version (a rectangle drawn on the finished picture, which followed the screen) is gone for good:
-    // the distortion is ONLY the plane in the world (drawMask), it never draws on the screen.
+    // ---------------------------------------------------------------- the effect (first thing the interface draws)
+    @SubscribeEvent
+    public static void onOverlay(RenderGuiOverlayEvent.Pre e) {
+        if (!e.getOverlay().id().equals(VanillaGuiOverlay.VIGNETTE.id())) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mask != null) return;      // the mask in the world does the job (drawMask); this screen version is only the fallback
+        if (!targetShown || target == null || target.isRemoved() || view == null || proj == null) return;
+
+        rollDice();
+        if (!on) return;
+
+        float pt = e.getPartialTick();
+        float[] r = screenRect(target, pt);
+        if (r == null) return;
+        try {
+            draw(mc, e.getPoseStack(), r);
+        } catch (Throwable ignored) {
+            // never break the game because of a graphics detail
+        } finally {
+            mc.getMainRenderTarget().bindWrite(false);      // whatever happened, the game picture is the target again
+            RenderSystem.enableCull();
+            RenderSystem.colorMask(true, true, true, true);
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+            RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
+        }
+    }
 
     /** the dice: on / off about 60 times a second, a new "noise" every time it is on. */
     private static void rollDice() {
@@ -242,16 +267,12 @@ public final class SlenderDistortion {
         float pt = e.getPartialTick();
         Vec3 ip = s.getPosition(pt);
         Vec3 cam = e.getCamera().getPosition();
-        // a REAL object: the plane stands exactly MASK_OFFSET blocks in front of his body (the way he faces), turned with him, and
-        // does not depend on where the player looks or stands. Come closer to him than that and you walk through it: it is gone.
         double dx = cam.x - ip.x, dz = cam.z - ip.z;
-        if (Math.sqrt(dx * dx + dz * dz) < MASK_OFFSET) return;
-        // the plane stands on the line between him and the camera and is turned to the camera (around the vertical axis only), so it is
-        // always seen from the front, whichever way his body is turned (a plane fixed to his facing was seen from the side = invisible)
-        double dl = Math.sqrt(dx * dx + dz * dz);
-        double nx = dx / dl, nz = dz / dl;                    // from him to the camera
-        double rx = nz, rz = -nx;                             // along the plane (to the side)
-        double off = MASK_OFFSET;
+        double flat = Math.sqrt(dx * dx + dz * dz);
+        if (flat < 0.6D) return;                              // he is on top of the camera
+        double nx = dx / flat, nz = dz / flat;                // from him to the camera
+        double rx = nz, rz = -nx;                             // to the right, seen from the camera
+        double off = Math.min(MASK_OFFSET, flat * 0.4D);
         double hw = 0.3D + PAD_SIDE;
         double y0 = ip.y - MASK_BELOW, y1 = ip.y + s.getBbHeight() + MASK_ABOVE;
         double cx = ip.x + nx * off, cz = ip.z + nz * off;
