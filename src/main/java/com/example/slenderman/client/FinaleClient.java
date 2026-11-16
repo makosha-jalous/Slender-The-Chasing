@@ -58,7 +58,15 @@ public final class FinaleClient {
             startPitch = mc.player.getXRot();
         }
         camera("setFinaleRun", newStage == SlenderFinale.STAGE_RUN);
-        if (newStage == SlenderFinale.STAGE_BLACK && old != SlenderFinale.STAGE_BLACK) camera("finaleBlackFlash", null);
+        if (newStage == SlenderFinale.STAGE_BLACK && old != SlenderFinale.STAGE_BLACK) {
+            wakeCalled = false;
+            setGain(0.0F);                       // the black screen: every sound is silent until the picture starts to fade in
+            camera("finaleBlackFlash", null);
+        }
+        if (old == SlenderFinale.STAGE_BLACK && newStage != SlenderFinale.STAGE_BLACK) {
+            restoreGain();
+            camera("finaleWakeStop", null);
+        }
         if (newStage == SlenderFinale.STAGE_NONE) releaseKeys(mc);
     }
 
@@ -86,9 +94,18 @@ public final class FinaleClient {
         if (mc.player == null || mc.level == null) { stage = SlenderFinale.STAGE_NONE; return; }
         if (System.currentTimeMillis() - lastMessageMs > SAFETY_MS) {
             stage = SlenderFinale.STAGE_NONE;
+            restoreGain();
+            camera("finaleWakeStop", null);
             camera("setFinaleRun", false);
             releaseKeys(mc);
             return;
+        }
+        // the black starts to fade: the sounds of the game come back and the camera wakes the heroine up (wind, lying on the side, the raising)
+        if (stage == SlenderFinale.STAGE_BLACK && !wakeCalled
+                && System.currentTimeMillis() - stageStartMs >= (long) (SlenderFinale.BLACK_SECONDS * 1000.0D)) {
+            wakeCalled = true;
+            restoreGain();
+            camera("finaleWakeStart", null);
         }
         if (stage < SlenderFinale.STAGE_TURN) return;
         boolean run = stage == SlenderFinale.STAGE_RUN;
@@ -100,6 +117,28 @@ public final class FinaleClient {
         mc.options.keyShift.setDown(false);
         // she jumps by herself when something stops her (a block, a fence of one block, a hill)
         mc.options.keyJump.setDown(run && (mc.player.horizontalCollision || mc.player.isInWater()));
+    }
+
+    private static boolean gainCut, wakeCalled;
+
+    /** the master volume of the whole game (the listener gain: it also silences the sounds that start meanwhile). */
+    private static void setGain(float g) {
+        try {
+            Minecraft.getInstance().getSoundManager().updateSourceVolume(net.minecraft.sounds.SoundSource.MASTER, g);
+            gainCut = true;
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void restoreGain() {
+        if (!gainCut) return;
+        gainCut = false;
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            mc.getSoundManager().updateSourceVolume(net.minecraft.sounds.SoundSource.MASTER,
+                    mc.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MASTER));
+        } catch (Throwable ignored) {
+        }
     }
 
     private static void releaseKeys(Minecraft mc) {
@@ -181,6 +220,8 @@ public final class FinaleClient {
     @SubscribeEvent
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         stage = SlenderFinale.STAGE_NONE;
+        restoreGain();
+        camera("finaleWakeStop", null);
         camera("setFinaleRun", false);
     }
 }

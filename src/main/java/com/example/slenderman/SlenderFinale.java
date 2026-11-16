@@ -54,6 +54,10 @@ public final class SlenderFinale {
     /** the black screen: full black, then fading in (seconds). */
     public static final double BLACK_SECONDS = 3.0D;
     public static final double FADE_SECONDS = 2.0D;
+    /** after the black screen the camera mod wakes the heroine up: she lies on her side (3 s, from the start of the fade), then the raising (the longest file is 2.5 s). The player cannot move all this time. */
+    public static final double WAKE_LIE_SECONDS = 3.0D;
+    public static final double WAKE_RAISE_SECONDS = 2.5D;
+    public static final double WAKE_MARGIN_SECONDS = 0.2D;
 
     public static final int STAGE_NONE = 0;
     public static final int STAGE_CALM = 1;
@@ -247,7 +251,7 @@ public final class SlenderFinale {
     // ---- BLACK
     private static void beginBlack(ServerPlayer player, State st) {
         st.stage = STAGE_BLACK;
-        st.ticks = (int) ((BLACK_SECONDS + FADE_SECONDS) * 20.0D);
+        st.ticks = (int) ((BLACK_SECONDS + WAKE_LIE_SECONDS + WAKE_RAISE_SECONDS + WAKE_MARGIN_SECONDS) * 20.0D);
         sendStage(player, STAGE_BLACK, 0);                  // the client: black at once + the flash sound
         discardSlender(player.level, st);
         SlenderSanity.reset(player);
