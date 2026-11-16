@@ -41,4 +41,41 @@ public final class FlashlightLink {
     public static boolean isOnAndFocused(Player player) {
         return state(player) >= FOCUSED;
     }
+
+    /**
+     * Turns off every lit flashlight of the player (the finale: she lies, the flashlight is off). We do not depend on the classes of the flashlight mod:
+     * first a static method setOn/setLit/... (ItemStack, boolean) of the item class, else the usual boolean tags of the stack.
+     */
+    public static void turnOffAll(Player player) {
+        java.util.List<net.minecraft.world.item.ItemStack> all = new java.util.ArrayList<>();
+        all.addAll(player.getInventory().items);
+        all.addAll(player.getInventory().offhand);
+        for (net.minecraft.world.item.ItemStack stack : all) {
+            if (stack.isEmpty() || !stack.getItem().getClass().getSimpleName().contains("Flashlight")) continue;
+            boolean done = false;
+            for (java.lang.reflect.Method m : stack.getItem().getClass().getMethods()) {
+                String n = m.getName();
+                Class<?>[] pt = m.getParameterTypes();
+                if (!(n.equals("setOn") || n.equals("setLit") || n.equals("setActive") || n.equals("setEnabled") || n.equals("setState"))) continue;
+                try {
+                    if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) && pt.length == 2
+                            && pt[0] == net.minecraft.world.item.ItemStack.class && pt[1] == boolean.class) {
+                        m.invoke(null, stack, false);
+                        done = true;
+                        break;
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            CompoundTag tag = stack.getTag();
+            if (tag == null) continue;
+            for (String key : new String[]{"on", "On", "ON", "lit", "Lit", "active", "Active", "enabled", "isOn", "turnedOn", "flashlight_on"}) {
+                if (tag.contains(key)) {
+                    byte type = tag.getTagType(key);
+                    if (type == net.minecraft.nbt.Tag.TAG_BYTE) tag.putBoolean(key, false);
+                    else if (type == net.minecraft.nbt.Tag.TAG_INT) tag.putInt(key, 0);
+                }
+            }
+        }
+    }
 }

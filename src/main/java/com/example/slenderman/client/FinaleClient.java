@@ -60,11 +60,16 @@ public final class FinaleClient {
         camera("setFinaleRun", newStage == SlenderFinale.STAGE_RUN);
         if (newStage == SlenderFinale.STAGE_BLACK && old != SlenderFinale.STAGE_BLACK) {
             wakeCalled = false;
-            setGain(0.0F);                       // the black screen: every sound is silent until the picture starts to fade in
+            // the black screen: every sound of the game stops and new ones are refused; only Static Heavy of the camera plays
+            try { mc.getSoundManager().stop(); } catch (Throwable ignored) { }
+            if (mc.player != null) {
+                lockYaw = mc.player.getYRot();
+                lockPitch = mc.player.getXRot();
+                lockPos = mc.player.position();
+            }
             camera("finaleBlackFlash", null);
         }
         if (old == SlenderFinale.STAGE_BLACK && newStage != SlenderFinale.STAGE_BLACK) {
-            restoreGain();
             camera("finaleWakeStop", null);
         }
         if (newStage == SlenderFinale.STAGE_NONE) releaseKeys(mc);
@@ -94,7 +99,6 @@ public final class FinaleClient {
         if (mc.player == null || mc.level == null) { stage = SlenderFinale.STAGE_NONE; return; }
         if (System.currentTimeMillis() - lastMessageMs > SAFETY_MS) {
             stage = SlenderFinale.STAGE_NONE;
-            restoreGain();
             camera("finaleWakeStop", null);
             camera("setFinaleRun", false);
             releaseKeys(mc);
@@ -104,8 +108,19 @@ public final class FinaleClient {
         if (stage == SlenderFinale.STAGE_BLACK && !wakeCalled
                 && System.currentTimeMillis() - stageStartMs >= (long) (SlenderFinale.BLACK_SECONDS * 1000.0D)) {
             wakeCalled = true;
-            restoreGain();
             camera("finaleWakeStart", null);
+        }
+        // the view cannot be moved: the server moves the player under the black screen (the new place and direction are taken as the lock)
+        if (stage == SlenderFinale.STAGE_BLACK && lockPos != null && mc.player.position().distanceToSqr(lockPos) > 0.25D) {
+            lockPos = mc.player.position();
+            lockYaw = mc.player.getYRot();
+            lockPitch = mc.player.getXRot();
+        }
+        if (stage == SlenderFinale.STAGE_BLACK) {
+            // while she lies nothing can be taken in the hand: no hotbar keys, no swap, no drop (the items come back after the scene)
+            for (KeyMapping k : mc.options.keyHotbarSlots) while (k.consumeClick()) { }
+            while (mc.options.keySwapOffhand.consumeClick()) { }
+            while (mc.options.keyDrop.consumeClick()) { }
         }
         if (stage < SlenderFinale.STAGE_TURN) return;
         boolean run = stage == SlenderFinale.STAGE_RUN;
@@ -119,26 +134,39 @@ public final class FinaleClient {
         mc.options.keyJump.setDown(run && (mc.player.horizontalCollision || mc.player.isInWater()));
     }
 
-    private static boolean gainCut, wakeCalled;
+    private static boolean wakeCalled;
+    private static float lockYaw, lockPitch;
+    private static Vec3 lockPos;
 
-    /** the master volume of the whole game (the listener gain: it also silences the sounds that start meanwhile). */
-    private static void setGain(float g) {
-        try {
-            Minecraft.getInstance().getSoundManager().updateSourceVolume(net.minecraft.sounds.SoundSource.MASTER, g);
-            gainCut = true;
-        } catch (Throwable ignored) {
-        }
+    /** the black screen and the waking up: no sound but the Static Heavy of the camera (until the picture starts to fade in). */
+    @SubscribeEvent
+    public static void onPlaySound(net.minecraftforge.client.event.sound.PlaySoundEvent event) {
+        if (stage != SlenderFinale.STAGE_BLACK || wakeCalled || event.getSound() == null) return;
+        if ("slendercamfx".equals(event.getSound().getLocation().getNamespace())) return;
+        event.setSound(null);
     }
 
-    private static void restoreGain() {
-        if (!gainCut) return;
-        gainCut = false;
-        try {
-            Minecraft mc = Minecraft.getInstance();
-            mc.getSoundManager().updateSourceVolume(net.minecraft.sounds.SoundSource.MASTER,
-                    mc.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MASTER));
-        } catch (Throwable ignored) {
-        }
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.HIGHEST)
+    public static void onScroll(net.minecraftforge.client.event.InputEvent.MouseScrollingEvent event) {
+        if (stage == SlenderFinale.STAGE_BLACK) event.setCanceled(true);
+    }
+
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.HIGHEST)
+    public static void onUse(net.minecraftforge.client.event.InputEvent.InteractionKeyMappingTriggered event) {
+        if (stage == SlenderFinale.STAGE_BLACK) event.setCanceled(true);
+    }
+
+    /** the view is held while the heroine lies. */
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.HIGHEST)
+    public static void onCameraAngles(net.minecraftforge.client.event.ViewportEvent.ComputeCameraAngles event) {
+        if (stage != SlenderFinale.STAGE_BLACK) return;
+        event.setYaw(lockYaw);
+        event.setPitch(lockPitch);
+    }
+
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.HIGHEST)
+    public static void onRenderHand(net.minecraftforge.client.event.RenderHandEvent event) {
+        if (stage == SlenderFinale.STAGE_BLACK) event.setCanceled(true);       // no item in the hands while she lies
     }
 
     private static void releaseKeys(Minecraft mc) {
@@ -161,6 +189,14 @@ public final class FinaleClient {
     /** the slow turn to him: the view moves toward him at a fixed speed (the mouse does nothing) and stays on him. */
     @SubscribeEvent
     public static void onRenderTick(TickEvent.RenderTickEvent event) {
+        if (event.phase == TickEvent.Phase.END && stage == SlenderFinale.STAGE_BLACK) {
+            Minecraft m = Minecraft.getInstance();
+            if (m.player != null) {            // the mouse moved the player during this frame: put it back
+                m.player.setYRot(lockYaw); m.player.setXRot(lockPitch);
+                m.player.yRotO = lockYaw; m.player.xRotO = lockPitch;
+            }
+            return;
+        }
         if (event.phase != TickEvent.Phase.START || stage != SlenderFinale.STAGE_TURN) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
@@ -220,7 +256,6 @@ public final class FinaleClient {
     @SubscribeEvent
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         stage = SlenderFinale.STAGE_NONE;
-        restoreGain();
         camera("finaleWakeStop", null);
         camera("setFinaleRun", false);
     }

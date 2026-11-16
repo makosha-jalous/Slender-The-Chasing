@@ -55,7 +55,7 @@ public final class SlenderFinale {
     public static final double BLACK_SECONDS = 3.0D;
     public static final double FADE_SECONDS = 2.0D;
     /** after the black screen the camera mod wakes the heroine up: she lies on her side (3 s, from the start of the fade), then the raising (the longest file is 2.5 s). The player cannot move all this time. */
-    public static final double WAKE_LIE_SECONDS = 3.0D;
+    public static final double WAKE_LIE_SECONDS = 5.5D;
     public static final double WAKE_RAISE_SECONDS = 2.5D;
     public static final double WAKE_MARGIN_SECONDS = 0.2D;
 
@@ -253,6 +253,7 @@ public final class SlenderFinale {
         st.stage = STAGE_BLACK;
         st.ticks = (int) ((BLACK_SECONDS + WAKE_LIE_SECONDS + WAKE_RAISE_SECONDS + WAKE_MARGIN_SECONDS) * 20.0D);
         sendStage(player, STAGE_BLACK, 0);                  // the client: black at once + the flash sound
+        FlashlightLink.turnOffAll(player);                  // she lies: the flashlight is off
         discardSlender(player.level, st);
         SlenderSanity.reset(player);
         // under the black screen: the spawn point, the other half of the day, no Slenderman
