@@ -136,17 +136,7 @@ public class SlendermanEntity extends PathfinderMob {
     private static final int[] CHECK_RAND = {0, 400, 400, 400, 400, 100, 100, 100, 100};
     /** how close he stands "right behind" the player (blocks, centre to centre). Touching him (hitboxes, about 0.7) kills; he never comes closer than about 2 blocks himself. */
     private static final double CONTACT_DIST = 1.6D;
-    /** the 7th page is collected and this time (2 min) has passed: he gets more aggressive and creeps up from BEHIND the player's back up to CLOSE_IN_DIST (the teleports keep the page band 3-5). */
-    private static final int CLOSE_IN_STAGE = 7;
-    private static final int CLOSE_IN_AFTER_TICKS = 20 * 60 * 2;
-    private static final double CLOSE_IN_DIST = 3.0D;
-    /** if the player stands still he may come this close (blocks). */
-    private static final double CLOSE_IN_STILL_DIST = 3.0D;
-    /** creeping up from behind: much faster than a WALKING player (blocks per second); a player who SPRINTS (from SPRINT_BPS) pulls away from him (slower than a sprint, 5.6). */
-    private static final double CLOSE_IN_FAST_BPS = 11.0D;
-    private static final double CLOSE_IN_RUN_BPS = 5.0D;
-    private static final double SPRINT_BPS = 5.0D;
-    private int lateStageTicks = 0;
+    // The timed close-in after page 7 has been removed: normal stalking distance is always used.
     /** no teleport ever puts him closer than this to the player (blocks, horizontal): the hitboxes must never touch by a teleport. */
     private static final double TELEPORT_MIN_DIST = 1.1D;
     /** the distance band he keeps while stalking (blocks), index = pages collected: pages 1-2: 30-35, 3: 13-17, 4: 10-13, 5: 7-9, 6: 5-7, 7: 3-5. */
@@ -1110,9 +1100,6 @@ public class SlendermanEntity extends PathfinderMob {
             this.angry = false;
         }
         this.stage = Mth.clamp(this.timedPages(player, pages), 1, SlenderPages.TOTAL);
-        // how long the 7th page has been collected (the clock of the close-in from behind); any other count resets it
-        if (pages == CLOSE_IN_STAGE && this.stage == CLOSE_IN_STAGE) this.lateStageTicks++;
-        else this.lateStageTicks = 0;
     }
 
     /** the finale of the 8th page (SlenderFinale) switches this on: he is placed by the finale, shows the tentacles and kills nobody. */
@@ -1319,29 +1306,26 @@ public class SlendermanEntity extends PathfinderMob {
     }
 
     /**
-     * The walking of the original: from the 2nd page, after his first teleport, only while the player does not see him
-     * (this method runs only then): towards the player at (pages + level) + 0.5 blocks per second. There is no distance band:
-     * the teleports bring him back to the page distance, and 2 blocks with a clear line is the end.
+     * From page 2 through page 7 he walks at a fixed 1 block per second, only while unseen.
+     * The player-distance catch-up bonus is deliberately disabled for these stages so it cannot raise that speed.
      */
     private boolean originalWalk(Player player, double dist) {
         int st = Mth.clamp(this.stage, 1, SlenderPages.TOTAL);
-        // everything as before (he walks up to CONTACT_DIST when unseen); 2 minutes after the 7th page, from behind the back: up to 1 block, and fast
-        boolean closeIn = st == CLOSE_IN_STAGE && !this.finaleMode && this.lateStageTicks >= CLOSE_IN_AFTER_TICKS && this.isBehind(player);
-        double stopDist = closeIn ? (this.playerSpeed * 20.0D < 0.3D ? CLOSE_IN_STILL_DIST : CLOSE_IN_DIST) : CONTACT_DIST;
-        if (!this.ported || st <= 1 || this.hiding || dist <= stopDist) {
+        if (!this.ported || st <= 1 || this.hiding || dist <= CONTACT_DIST) {
             this.getNavigation().stop();
             return false;
         }
-        double blocksPerSecond = (st + LEVEL + ORIGINAL_WALK_BASE) * ORIGINAL_WALK_SCALE;
-        if (dist > BAND_MAX[st]) {
-            // too far behind the page distance: at least as fast as the player (times the page factor) plus a bit for every block of the gap
+        boolean fixedWalkSpeed = st >= 2 && st <= 7;
+        double blocksPerSecond = fixedWalkSpeed
+                ? 1.0D
+                : (st + LEVEL + ORIGINAL_WALK_BASE) * ORIGINAL_WALK_SCALE;
+        if (!fixedWalkSpeed && dist > BAND_MAX[st]) {
+            // Outside pages 2-7, retain the original distance-based catch-up behavior.
             double playerBps = this.playerSpeed * 20.0D;
             blocksPerSecond = Math.max(blocksPerSecond, playerBps * CATCH_PLAYER_MUL[st])
                     + Math.min(CATCH_GAP_MAX, (dist - BAND_MAX[st]) * CATCH_GAP_BPS);
         }
         blocksPerSecond = Math.min(blocksPerSecond, WALK_BPS_MAX);
-        // creeping up from behind: quick on a walking player, slower than a sprinting one (he can run away)
-        if (closeIn) blocksPerSecond = this.playerSpeed * 20.0D >= SPRINT_BPS ? Math.min(blocksPerSecond, CLOSE_IN_RUN_BPS) : Math.max(blocksPerSecond, CLOSE_IN_FAST_BPS);
         double mul = blocksPerSecond / 20.0D / BLOCKS_PER_TICK_AT_ONE;
         Vec3 goal = player.position();
         // the body and the head turn smoothly to the player all the time; he walks straight at the player and goes around things SIDEWAYS
