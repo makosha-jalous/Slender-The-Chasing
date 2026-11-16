@@ -110,7 +110,7 @@ public class SlendermanEntity extends PathfinderMob {
     /** the distance he keeps to the player while stalking (blocks). */
     private static final double[] KEEP_DIST     = {22.5, 22.5, 22.5, 15.0, 15.0,  9.0,  9.0,  6.0,  6.0};
     /** walking speed multiplier (0 = he does not walk, he only appears at a new place). */
-    private static final double[] WALK_MOD      = { 0.0,  0.7,  0.7,  0.8,  1.0,  1.0, 1.0,  1.0,  1.0};
+    private static final double[] WALK_MOD      = { 0.0,  0.7,  0.7,  0.7,  0.7,  0.7, 0.7,  0.7,  0.7};
     /** ticks between two "ambush" teleports (0 = none) and the chance that such a check really teleports. */
     private static final int[]    AMBUSH_EVERY  = {   0,    0,    0,    0,    0,  200,  160,  100,  100};
     /** chance per tick to vanish after a long stare (0 = he never vanishes). */
