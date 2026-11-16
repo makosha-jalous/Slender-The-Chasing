@@ -48,18 +48,18 @@ public class SlendermanModel extends EntityModel<SlendermanEntity> {
     /** head tilts sideways towards the reaching (right) arm; negative = right side goes down. */
     private static final float REACH_HEAD_TILT = -0.30F;
 
-    // ---- the walk ----
+    // ---- the walk (the amplitudes are taken from the reference video: slow, the arms hang and swing a little, the knee lifts, the torso is hunched) ----
     /** torso + head lean forward (radians, ~12 degrees). */
     private static final float WALK_LEAN = 0.21F;
     /** the torso turns this far to each side (radians, ~16 degrees). */
-    private static final float WALK_TORSO_YAW = 0.28F;
+    private static final float WALK_TORSO_YAW = 0.10F;
     /** the arms swing this far (radians, ~34 degrees). */
-    private static final float WALK_ARM = 0.60F;
+    private static final float WALK_ARM = 0.22F;
     /** the extra bend of the forearm at the top of the swing (radians). */
-    private static final float WALK_ELBOW = 0.45F;
+    private static final float WALK_ELBOW = 0.18F;
     /** the thigh goes this far forward / back (radians, ~26 degrees) and the knee bends this much at most (radians, ~52 degrees). */
-    private static final float WALK_STEP = 0.45F;
-    private static final float WALK_KNEE = 0.90F;
+    private static final float WALK_STEP = 0.30F;
+    private static final float WALK_KNEE = 0.75F;
 
     /** how far FORWARD the thigh is (+ forward) at this phase of the leg: the first half = the step (back to forward), the second = straight, going back. */
     private static float legSwing(float phase) {
@@ -518,10 +518,10 @@ public class SlendermanModel extends EntityModel<SlendermanEntity> {
         float lookPitch = Mth.clamp(headPitch, -40F, 40F) * DEG;
 
         // ---------- the walk (only while he really walks; fades in and out in 300 ms, zero when he stands or acts) ----------
-        // One full cycle = 1 s: 500 ms the torso turns to his right and the RIGHT arm comes forward while the LEFT leg steps,
+        // One full cycle = 2.6 s (1.3 s per step, small swings like the reference video): the torso turns to his right and the RIGHT arm comes forward while the LEFT leg steps,
         // 500 ms the torso turns to his left and the LEFT arm comes forward while the RIGHT leg steps. The head does not move with the torso.
         float walk = entity.getWalkAnim(partial) * (1F - Math.max(reach, bow));
-        float ph = ageInTicks * (Mth.PI / 10F);                   // 20 ticks = 1 s = one full cycle
+        float ph = ageInTicks * (Mth.PI / 26F);                   // 52 ticks = 2.6 s = one full cycle (as in the reference video: slow, small swings)
         float sRaw = Mth.sin(ph);
         float s = sRaw * walk;                                    // + = torso right and right arm forward, - = torso left and left arm forward
         float lean = WALK_LEAN * walk;                            // the hunch: torso and head a little forward

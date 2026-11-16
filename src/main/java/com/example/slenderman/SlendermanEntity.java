@@ -139,7 +139,9 @@ public class SlendermanEntity extends PathfinderMob {
     /** the 7th page is collected and this time (2 min) has passed: he gets more aggressive and creeps up from BEHIND the player's back up to CLOSE_IN_DIST (the teleports keep the page band 3-5). */
     private static final int CLOSE_IN_STAGE = 7;
     private static final int CLOSE_IN_AFTER_TICKS = 20 * 60 * 2;
-    private static final double CLOSE_IN_DIST = 1.0D;
+    private static final double CLOSE_IN_DIST = 2.0D;
+    /** if the player stands still he may come this close (blocks). */
+    private static final double CLOSE_IN_STILL_DIST = 1.0D;
     /** creeping up from behind: much faster than a WALKING player (blocks per second); a player who SPRINTS (from SPRINT_BPS) pulls away from him (slower than a sprint, 5.6). */
     private static final double CLOSE_IN_FAST_BPS = 11.0D;
     private static final double CLOSE_IN_RUN_BPS = 5.0D;
@@ -511,7 +513,8 @@ public class SlendermanEntity extends PathfinderMob {
         // the walking animation fades in / out in 300 ms (he moved this tick = he walks)
         this.walkAnimO = this.walkAnim;
         boolean moved = Math.hypot(this.getX() - this.xo, this.getZ() - this.zo) > 0.02D;
-        this.walkAnim += Mth.clamp((moved ? 1.0F : 0.0F) - this.walkAnim, -WALK_ANIM_STEP, WALK_ANIM_STEP);
+        if (moved) this.walkAnim += Mth.clamp(1.0F - this.walkAnim, -WALK_ANIM_STEP, WALK_ANIM_STEP);
+        else this.walkAnim = 0.0F;          // he stopped (seen): straight back to the stance at once, no fading
         if (this.level.isClientSide) {
             tentPrev = tentNow;
             tentNow = this.entityData.get(DATA_TENT);
@@ -838,6 +841,46 @@ public class SlendermanEntity extends PathfinderMob {
         }
     }
 
+    /** the side he steps to while something is in the way (+1 / -1), and for how many more ticks. */
+    private int sideDir, sideTicks;
+
+    /**
+     * Straight at the player, always (no path finding, no zigzags). When something blocks the way he steps sideways (the body still faces the player),
+     * keeps going along the obstacle and goes straight again as soon as the way is free.
+     */
+    private void straightWalk(Vec3 goal, double speed) {
+        this.getNavigation().stop();
+        double dx = goal.x - this.getX(), dz = goal.z - this.getZ();
+        double len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 1.0E-4D) return;
+        double ux = dx / len, uz = dz / len;
+        double px = -uz, pz = ux;                         // to his left, looking at the player
+        if (this.sideTicks > 0) {
+            this.sideTicks--;
+        } else if (this.horizontalCollision && len > 1.0D) {
+            boolean leftFree = this.sideFree(px, pz), rightFree = this.sideFree(-px, -pz);
+            if (leftFree || rightFree) {
+                this.sideDir = leftFree && (!rightFree || this.random.nextBoolean()) ? 1 : -1;
+                this.sideTicks = 12;
+            }
+        }
+        double tx = ux, tz = uz;
+        if (this.sideTicks > 0 && this.sideDir != 0) {
+            // mostly sideways, a little forward: along the obstacle
+            tx = px * this.sideDir * 0.9D + ux * 0.3D;
+            tz = pz * this.sideDir * 0.9D + uz * 0.3D;
+            if (this.horizontalCollision && this.sideTicks < 8) { this.sideDir = -this.sideDir; this.sideTicks = 12; }   // blocked on that side too: the other one
+        }
+        this.getMoveControl().setWantedPosition(this.getX() + tx * 3.0D, goal.y, this.getZ() + tz * 3.0D, speed);
+    }
+
+    /** is the block one step to this side (at the feet and at the head) free? */
+    private boolean sideFree(double sx, double sz) {
+        net.minecraft.core.BlockPos feet = new net.minecraft.core.BlockPos(this.getX() + sx * 1.0D, this.getY() + 0.1D, this.getZ() + sz * 1.0D);
+        return this.level.getBlockState(feet).getCollisionShape(this.level, feet).isEmpty()
+                && this.level.getBlockState(feet.above()).getCollisionShape(this.level, feet.above()).isEmpty();
+    }
+
     /** a random distance inside the band of the current stage. */
     private double bandDistance() {
         int st = Mth.clamp(this.stage, 1, SlenderPages.TOTAL);
@@ -870,6 +913,10 @@ public class SlendermanEntity extends PathfinderMob {
     private void standStill() {
         this.getNavigation().stop();
         this.pathRetry = 0;
+        this.sideTicks = 0;
+        this.setZza(0.0F);
+        this.setXxa(0.0F);
+        this.setSpeed(0.0F);
         this.setDeltaMovement(0.0D, this.getDeltaMovement().y, 0.0D);
     }
 
@@ -1280,7 +1327,7 @@ public class SlendermanEntity extends PathfinderMob {
         int st = Mth.clamp(this.stage, 1, SlenderPages.TOTAL);
         // everything as before (he walks up to CONTACT_DIST when unseen); 2 minutes after the 7th page, from behind the back: up to 1 block, and fast
         boolean closeIn = st == CLOSE_IN_STAGE && !this.finaleMode && this.lateStageTicks >= CLOSE_IN_AFTER_TICKS && this.isBehind(player);
-        double stopDist = closeIn ? CLOSE_IN_DIST : CONTACT_DIST;
+        double stopDist = closeIn ? (this.playerSpeed * 20.0D < 0.3D ? CLOSE_IN_STILL_DIST : CLOSE_IN_DIST) : CONTACT_DIST;
         if (!this.ported || st <= 1 || this.hiding || dist <= stopDist) {
             this.getNavigation().stop();
             return false;
@@ -1300,7 +1347,7 @@ public class SlendermanEntity extends PathfinderMob {
         // the body and the head turn smoothly to the player all the time; he walks straight at the player and goes around things SIDEWAYS
         this.faceToward(player.position(), WALK_TURN_DEG);
         this.strafeWalking = true;
-        this.walkToward(goal.x, goal.y, goal.z, mul);
+        this.straightWalk(goal, mul);
         this.watchProgress(player, dist, CATCH_DIST);
         return true;
     }
