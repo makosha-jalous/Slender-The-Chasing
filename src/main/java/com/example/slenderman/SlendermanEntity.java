@@ -110,7 +110,7 @@ public class SlendermanEntity extends PathfinderMob {
     /** the distance he keeps to the player while stalking (blocks). */
     private static final double[] KEEP_DIST     = {22.5, 22.5, 22.5, 15.0, 15.0,  9.0,  9.0,  6.0,  6.0};
     /** walking speed multiplier (0 = he does not walk, he only appears at a new place). */
-    private static final double[] WALK_MOD      = { 0.0,  0.7,  0.7,  0.8,  1.0,  1.15, 1.3,  1.5,  1.5};
+    private static final double[] WALK_MOD      = { 0.0,  0.7,  0.7,  0.8,  1.0,  1.0, 1.0,  1.0,  1.0};
     /** ticks between two "ambush" teleports (0 = none) and the chance that such a check really teleports. */
     private static final int[]    AMBUSH_EVERY  = {   0,    0,    0,    0,    0,  200,  160,  100,  100};
     /** chance per tick to vanish after a long stare (0 = he never vanishes). */
@@ -139,9 +139,9 @@ public class SlendermanEntity extends PathfinderMob {
     /** the 7th page is collected and this time (2 min) has passed: he gets more aggressive and creeps up from BEHIND the player's back up to CLOSE_IN_DIST (the teleports keep the page band 3-5). */
     private static final int CLOSE_IN_STAGE = 7;
     private static final int CLOSE_IN_AFTER_TICKS = 20 * 60 * 2;
-    private static final double CLOSE_IN_DIST = 2.0D;
+    private static final double CLOSE_IN_DIST = 3.0D;
     /** if the player stands still he may come this close (blocks). */
-    private static final double CLOSE_IN_STILL_DIST = 1.0D;
+    private static final double CLOSE_IN_STILL_DIST = 3.0D;
     /** creeping up from behind: much faster than a WALKING player (blocks per second); a player who SPRINTS (from SPRINT_BPS) pulls away from him (slower than a sprint, 5.6). */
     private static final double CLOSE_IN_FAST_BPS = 11.0D;
     private static final double CLOSE_IN_RUN_BPS = 5.0D;
