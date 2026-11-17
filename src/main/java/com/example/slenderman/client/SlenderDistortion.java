@@ -54,7 +54,7 @@ public final class SlenderDistortion {
     /** how often the dice are thrown (ms): 16 = about 60 times a second whatever the FPS is. */
     private static final long ROLL_MS = 16L;
     /** how far the rectangle reaches beyond his body (blocks, to the sides / up and down). */
-    private static final double PAD_SIDE = 4.0D;        // much wider than his body, like the plane of the original (was 0.7)
+    private static final double PAD_SIDE = 2.0D;        // the window of the original video: about 0.55 of his height to each side (was 4.0: too wide)
     private static final double PAD_UPDOWN = 1.0D;
     /** the waving sideways (share of the rectangle width). */
     private static final float WAVE = 0.06F;
@@ -117,14 +117,14 @@ public final class SlenderDistortion {
     private static final double MASK_OFFSET = 0.7D;
     /** the plane reaches from below the ground (the depth test of the game cuts it at the ground) to this far above his head (blocks). */
     private static final double MASK_BELOW = 0.7D;
-    private static final double MASK_ABOVE = 1.0D;
+    private static final double MASK_ABOVE = 0.5D;
     /** the burn-out of the light parts of the picture (0..1) and the warm streaks in the dark parts: they are NOT a light overlay. */
-    private static final float BURN = 2.5F;
+    private static final float BURN = 2.0F;
     private static final float WARM = 0.12F;
     /** how many waves fit into the height of the plane (the old screen version had dozens: that was too many). */
-    private static final float MASK_WAVES = 1.5F;
+    private static final float MASK_WAVES = 1.3F;
     /** how strong the bending of the plane is against the old screen version (the original bends the picture less: ghosts and ripples, not melting). */
-    private static final float MASK_AMOUNT = 0.50F;
+    private static final float MASK_AMOUNT = 0.35F;
 
     @Mod.EventBusSubscriber(modid = SlendermanMod.ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static final class Reg {
@@ -269,7 +269,7 @@ public final class SlenderDistortion {
         Vec3 cam = e.getCamera().getPosition();
         double dx = cam.x - ip.x, dz = cam.z - ip.z;
         double flat = Math.sqrt(dx * dx + dz * dz);
-        if (flat < 0.6D) return;                              // he is on top of the camera
+        if (flat < 0.2D) return;                              // he is on top of the camera (from 1 block and closer the plane is still seen)
         double nx = dx / flat, nz = dz / flat;                // from him to the camera
         double rx = nz, rz = -nx;                             // to the right, seen from the camera
         double off = Math.min(MASK_OFFSET, flat * 0.4D);
@@ -310,9 +310,9 @@ public final class SlenderDistortion {
         RenderSystem.setShaderTexture(0, copy.getColorTextureId());
         mask.safeGetUniform("MaskScreen").set((float) tw, (float) th);
         float kl = lightK(depth) * (0.55F + 0.45F * strength);
-        mask.safeGetUniform("Effect").set(BURN * kl, WARM * kl, 0F, ca);
+        mask.safeGetUniform("Effect").set(BURN * kl, 0F, 0F, ca);
         mask.safeGetUniform("Wave").set(base * gain * MASK_AMOUNT * (0.6F + 0.8F * strength), t, MASK_WAVES, base / TRANSPARENCY * CA_ALPHA_BOOST);
-        mask.safeGetUniform("Edge").set(FEATHER, stretch, phase / 6.2831853F, 0F);
+        mask.safeGetUniform("Edge").set(0F, stretch, phase / 6.2831853F, 0F);      // no soft border: hard edges like in the video
 
         Matrix4f m = e.getPoseStack().last().pose();
         double[][] c = {

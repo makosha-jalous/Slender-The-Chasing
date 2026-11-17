@@ -1,24 +1,25 @@
 #version 150
 
-// THE MASK: a plane that stands in the WORLD in front of Slenderman (from the ground to above his head, much wider than he is).
-// It shows the picture of the screen (a copy taken just before) from a shifted place, so it bends everything behind it and him
-// together with it. It does NOT paint a light rectangle: the waves differ in amplitude and stretch from place to place and from flash
-// to flash, and the "exposure" works only on the LIGHT, not blue parts of the picture (they burn out to white), the dark parts stay
-// dark. Because it is a real object it is hidden by everything that stands in front of it (the depth test of the game).
+// THE MASK: a plane that stands in the WORLD in front of Slenderman. It shows the picture of the screen (a copy taken just before)
+// from a shifted place, so it bends everything behind it and him together with it.
+// Made after the video of the original:
+//  - HARD edges (no soft border): a window, inside it the picture is bent, outside it is untouched;
+//  - few LONG waves: the trunks bend into big slow S-curves, and some vertical strands (the picture is pulled sideways in thin
+//    vertical streaks) - not a fine ripple;
+//  - the exposure is turned up to the maximum INSIDE the window (everything gets brighter: trees, stones, him) with a hard contrast:
+//    the lights burn out, the darks stay black. It is NOT a light rectangle: nothing is painted over the picture, it is the same picture.
 uniform sampler2D Sampler0;
 uniform vec2 MaskScreen;
-uniform vec4 Effect;   // x = how much the light parts burn out (0..1), y = warm streaks in the dark (0..1), z = not used, w = shift of red and blue
-uniform vec4 Wave;     // x = how far the picture is bent (share of the screen), y = time (s), z = waves over the height, w = opacity scale
-uniform vec4 Edge;     // x = width of the soft side border (share of the plane), y = stretch of THIS flash (0..1), z = seed of THIS flash, w = not used
+uniform vec4 Effect;   // x = exposure of the flash (0..2), y = not used, z = not used, w = shift of red and blue
+uniform vec4 Wave;     // x = how far the picture is bent (share of the screen), y = time (s), z = long bends over the height, w = opacity
+uniform vec4 Edge;     // x = not used (no soft border), y = stretch of THIS flash (0..1), z = seed of THIS flash, w = not used
 
 in vec2 uv;
 out vec4 fragColor;
 
-// the character of the waves: LONG, slow waves (fewer of them over the height), not a fine ripple. Bigger WAVE_STRETCH = more variety
-// between flashes; BURN_GAIN = how hard the light parts are overexposed.
-const float WAVE_STRETCH = 1.8;
-const float WAVE_SPEED = 0.9;
-const float BURN_GAIN = 2.8;
+const float EXPOSURE_GAIN = 1.0;     // brightness: 1 + exposure * gain (2.0 -> x3)
+const float CONTRAST_GAIN = 0.45;    // hardness of the contrast
+const float CONTRAST_PIVOT = 0.25;
 
 float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -33,25 +34,20 @@ float vnoise(vec2 p) {
 }
 
 void main() {
-    // soft borders: at the sides and at the top (the bottom is the ground: the depth test cuts the plane there)
-    float ex = clamp(min(uv.x, 1.0 - uv.x) / Edge.x, 0.0, 1.0);
-    float et = clamp((1.0 - uv.y) / 0.22, 0.0, 1.0);
-    float w = smoothstep(0.0, 1.0, ex) * smoothstep(0.0, 1.0, et);
     float t = Wave.y;
     float seed = Edge.z;
     float st = Edge.y;
 
-    // the waves are NOT the same everywhere: bands along the height with a different amplitude, a different stretch (frequency)
-    float band = vnoise(vec2(uv.y * 2.2 + seed * 3.0, t * 0.7 + seed));
-    float amp = 0.50 + 1.00 * band * band;           // every wave has its own size, but none of them tears the picture apart
-    float freq = mix(Wave.z, Wave.z * WAVE_STRETCH, st);
-    float sx = vnoise(vec2(uv.y * freq + t * WAVE_SPEED + seed * 5.0, uv.x * 1.2 - t * 0.5))
-             + vnoise(vec2(uv.y * freq * 1.6 - t * WAVE_SPEED * 1.5, uv.x * 2.6 + seed * 3.0)) - 1.0;
-    float sy = vnoise(vec2(uv.x * 2.0 + t * 0.7 + seed, uv.y * 1.5 + t * 1.1))
-             + vnoise(vec2(uv.x * 3.1 - t * 1.4, uv.y * 2.2 - t * 0.6 + seed)) - 1.0;
-    float amount = Wave.x * w * w;
-    vec2 off = vec2(sx * amp, sy * (0.6 + 1.6 * st) * amp) * amount;
-    off.y += (band - 0.5) * st * amount * 1.5;                      // the picture is dragged up / down in streaks
+    // the long S-bends (a few over the height), slowly changing
+    float bend  = vnoise(vec2(uv.y * Wave.z + t * 0.6 + seed * 5.0, uv.x * 0.7 + seed * 2.0)) - 0.5;
+    float bend2 = vnoise(vec2(uv.y * Wave.z * 0.55 - t * 0.4 + seed * 3.0, 3.0 + uv.x * 0.5)) - 0.5;
+    // the vertical strands: changes quickly from left to right, slowly from top to bottom
+    float strand = vnoise(vec2(uv.x * (9.0 + 8.0 * st) + seed * 7.0, uv.y * 0.9 - t * 0.5)) - 0.5;
+    float strandAmp = 0.55 + 0.90 * vnoise(vec2(uv.y * 1.1 + seed * 4.0, t * 0.5));
+    float sx = bend * 1.1 + bend2 * 0.8 + strand * strandAmp;
+    // a little up / down drag: the tops of the trunks are pulled
+    float sy = (vnoise(vec2(uv.x * 5.0 + seed * 3.0, uv.y * 1.2 + t * 0.5)) - 0.5) * (0.4 + 1.2 * st);
+    vec2 off = vec2(sx, sy * 0.6) * Wave.x;
 
     vec2 sc = gl_FragCoord.xy / MaskScreen + off;
     vec3 c;
@@ -59,20 +55,13 @@ void main() {
     c.g = texture(Sampler0, sc).g;
     c.b = texture(Sampler0, sc - vec2(Effect.w, 0.0)).b;
 
-    // the high exposure of the flash: ONLY the light parts (and the warm, not the blue ones) burn out to white
-    float l = dot(c, vec3(0.299, 0.587, 0.114));
-    float hi = smoothstep(0.18, 0.60, l);
-    float warm = smoothstep(-0.03, 0.10, c.r - c.b);
-    float weight = hi * (0.40 + 0.60 * warm);
-    float burn = Effect.x * w * weight * (0.55 + 0.90 * band);
-    c *= 1.0 + burn * BURN_GAIN;
+    // the exposure turned up + the hard contrast: lights burn out, darks go black
+    float ex = Effect.x;
+    c *= 1.0 + ex * EXPOSURE_GAIN;
+    c = (c - CONTRAST_PIVOT) * (1.0 + ex * CONTRAST_GAIN) + CONTRAST_PIVOT;
     float peak = max(c.r, max(c.g, c.b));
-    c = mix(c, vec3(peak), clamp(burn, 0.0, 1.0) * 0.35);            // white-hot: the colours are pulled together
+    c = mix(c, vec3(peak), clamp(peak - 1.0, 0.0, 1.0) * 0.5);        // what is burnt out turns white
 
-    // the dark parts are not lifted (that would be a light rectangle): only thin warm streaks inside the waves
-    float streak = vnoise(vec2(uv.x * 6.0 + seed * 9.0, uv.y * 1.5 - t * 0.8));
-    c += vec3(0.28, 0.11, 0.02) * (1.0 - hi) * w * streak * streak * Effect.y * Effect.x;
-
-    float a = clamp(Wave.w * w * w * w, 0.0, 1.0);
+    float a = clamp(Wave.w, 0.0, 1.0);                                  // hard edges: the same opacity everywhere inside
     fragColor = vec4(clamp(c, 0.0, 1.0), a);
 }
