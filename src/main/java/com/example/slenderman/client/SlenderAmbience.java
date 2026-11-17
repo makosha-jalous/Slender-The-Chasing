@@ -31,8 +31,10 @@ import net.minecraftforge.fml.common.Mod;
  *  - WIND (wind.ogg): a loop that plays OUTSIDE. Inside a building it is 70 % quieter, deep underground it is silent.
  *    Going inside it fades out in 2 s, coming out it fades in again in 3 s.
  *  - BASS (bassambiance.ogg): a loop that plays only INSIDE buildings and in caves, and only while a Slenderman exists.
- *  - BUSH (bush_move.ogg): a sound in the world (not in the head): at a random point up to 45 blocks from the player, the loudness falls with
- *    the distance like in the original; the same timer range as the footsteps. The leaves (footsteps and bush) are silent indoors and in caves.
+ *  - BUSH (bush_move.ogg): a sound in the world (not in the head): at a random point up to 45 blocks from the player (from the left, from the right
+ *    or "in both ears", random); the loudness falls with the distance like in the original; the same timer range as the footsteps.
+ *    The footsteps in the leaves are in the world too now (foot3d_a/b/c.ogg are mono): from the left, from the right, in the middle, coming closer
+ *    (getting louder) or going around the player (left to right / right to left). All leaves are silent indoors and in caves.
  *  - FOOTSTEPS (foot_*.ogg): only while a Slenderman exists. Every 30 s - 2 min, at random: left only, right only,
  *    both channels (steady or getting louder), or sliding from left to right / from right to left.
  *    The pitch and the speed are a little different every time.
@@ -81,8 +83,6 @@ public final class SlenderAmbience {
     private static final float BUSH_PITCH_VAR = 0.1F;
 
     private static final String NS = "slenderambient";
-    private static final String[] FOOT_EVENTS = {
-            "footsteps_l", "footsteps_r", "footsteps_both", "footsteps_rise", "footsteps_lr", "footsteps_rl"};
 
     // ---------------------------------------------------------------- state
     private static final RandomSource RNG = RandomSource.create();
@@ -241,7 +241,7 @@ public final class SlenderAmbience {
         if (slender) {
             if (footWait < 0) footWait = FOOT_MIN_TICKS + RNG.nextInt(FOOT_RANDOM_TICKS + 1);
             else if (--footWait == 0) {
-                if (leavesOk) playFootsteps(sm);
+                if (leavesOk) playFootsteps(sm, mc);
                 footWait = -1;
             }
             if (bushWait < 0) bushWait = BUSH_MIN_TICKS + RNG.nextInt(BUSH_RANDOM_TICKS + 1);
@@ -269,40 +269,105 @@ public final class SlenderAmbience {
         return fresh;
     }
 
-    private static void playFootsteps(SoundManager sm) {
-        String event = FOOT_EVENTS[RNG.nextInt(FOOT_EVENTS.length)];
+    // the modes of a placed sound: where it stands / how it moves, seen from the player at the start
+    private static final int M_LEFT = 0, M_RIGHT = 1, M_BOTH = 2, M_RISE = 3, M_LR = 4, M_RL = 5;
+    /** the base footstep sound has three variants; these are the lengths of foot3d_a / b / c (seconds). */
+    private static final String[] FOOT_VARIANTS = {"foot3d_a", "foot3d_b", "foot3d_c"};
+    private static final float[] FOOT_VARIANT_SEC = {5.153F, 4.554F, 4.010F};
+
+    /**
+     * The footsteps in the leaves: now they stand in the world too. The mode is random, as before:
+     * only from the left side, only from the right side, "in both ears" (in front of / behind the player), getting louder (comes closer),
+     * sliding from the left to the right or from the right to the left (goes around the player).
+     */
+    private static void playFootsteps(SoundManager sm, Minecraft mc) {
+        int v = RNG.nextInt(FOOT_VARIANTS.length);
+        int mode = RNG.nextInt(6);
         float pitch = FOOT_PITCH_MIN + RNG.nextFloat() * (FOOT_PITCH_MAX - FOOT_PITCH_MIN);
-        float volume = VOLUME * (0.85F + 0.15F * RNG.nextFloat());
-        // a plain 2D sound: the stereo files keep their left / right channels exactly as they were made
-        sm.play(new SimpleSoundInstance(new ResourceLocation(NS, event), SoundSource.AMBIENT, volume, pitch,
-                RandomSource.create(), false, 0, SoundInstance.Attenuation.NONE, 0.0D, 0.0D, 0.0D, true));
+        float gain = 0.85F + 0.15F * RNG.nextFloat();
+        placed(sm, mc, FOOT_VARIANTS[v], gain, pitch, mode, FOOT_VARIANT_SEC[v] / pitch);
     }
 
-    /** the bush sound is placed in the world: a random point up to 45 blocks around the player (as in the original), it stays there. */
+    /** the bush sound: a random point up to 45 blocks away; from the left, from the right or "in both ears" (random). */
     private static void playBush(SoundManager sm, Minecraft mc) {
+        int mode = RNG.nextInt(3);                       // M_LEFT, M_RIGHT, M_BOTH
+        float pitch = 1.0F + (RNG.nextFloat() * 2.0F - 1.0F) * BUSH_PITCH_VAR;
+        placed(sm, mc, "bush", BUSH_VOLUME, pitch, mode, 0.0D);
+    }
+
+    private static void placed(SoundManager sm, Minecraft mc, String event, float gain, float pitch, int mode, double lifeSec) {
         Player p = mc.player;
         if (p == null) return;
-        double a = RNG.nextDouble() * Math.PI * 2.0D;
-        double dx = Math.cos(a) * RNG.nextInt(BUSH_MAX_DIST + 1);
-        double dz = Math.sin(a) * RNG.nextInt(BUSH_MAX_DIST + 1);
-        float pitch = 1.0F + (RNG.nextFloat() * 2.0F - 1.0F) * BUSH_PITCH_VAR;
-        sm.play(new BushSound(p.getX() + dx, p.getY(), p.getZ() + dz, pitch));
+        double a0, a1, r0, r1;
+        double front = RNG.nextBoolean() ? 0.0D : Math.PI;          // for "in both ears": in front of or behind the player (the sound is in the middle)
+        double spread = Math.toRadians(-15 + RNG.nextInt(31));
+        switch (mode) {
+            case M_LEFT:
+                a0 = a1 = -Math.toRadians(50 + RNG.nextInt(81));    // the left side (50..130 degrees from the front)
+                r0 = r1 = 3 + RNG.nextInt(BUSH_MAX_DIST - 2);
+                break;
+            case M_RIGHT:
+                a0 = a1 = Math.toRadians(50 + RNG.nextInt(81));
+                r0 = r1 = 3 + RNG.nextInt(BUSH_MAX_DIST - 2);
+                break;
+            case M_RISE:                                            // in the middle, comes closer = gets louder
+                a0 = a1 = front + spread;
+                r0 = 40 + RNG.nextInt(6);
+                r1 = 8 + RNG.nextInt(5);
+                break;
+            case M_LR:
+            case M_RL: {
+                boolean back = RNG.nextBoolean();                   // goes around in front of the player or behind him
+                double from = -Math.PI / 2, to = back ? -Math.PI * 1.5 : Math.PI / 2;
+                a0 = mode == M_LR ? from : to;
+                a1 = mode == M_LR ? to : from;
+                r0 = r1 = 6 + RNG.nextInt(25);
+                break;
+            }
+            default:                                                // M_BOTH: in the middle, steady
+                a0 = a1 = front + spread;
+                r0 = r1 = 3 + RNG.nextInt(BUSH_MAX_DIST - 2);
+        }
+        double yaw = Math.toRadians(p.getYRot());
+        int life = (int) Math.max(1, Math.round(lifeSec * 20.0D));
+        sm.play(new PlacedSound(event, gain, pitch, p.getX(), p.getY(), p.getZ(),
+                -Math.sin(yaw), Math.cos(yaw), -Math.cos(yaw), -Math.sin(yaw), a0, a1, r0, r1, life));
     }
 
-    /** a sound standing at one point of the world: the direction comes from the position, the loudness is set by us (the distance changes while the player walks). */
-    private static final class BushSound extends AbstractTickableSoundInstance {
-        BushSound(double px, double py, double pz, float pitch) {
-            super(new SoundEvent(new ResourceLocation(NS, "bush")), SoundSource.AMBIENT, RandomSource.create());
+    /**
+     * A sound standing in the world (it is NOT moved with the player): the direction comes from its position, the loudness is set by us
+     * (full inside 20 blocks, then 20 / distance, as in the original), for the moving modes the point goes around / comes closer.
+     */
+    private static final class PlacedSound extends AbstractTickableSoundInstance {
+        private final float gain;
+        private final double cx, cz, fx, fz, rx, rz, a0, a1, r0, r1;
+        private final int life;
+        private int age = 0;
+
+        PlacedSound(String event, float gain, float pitch, double cx, double cy, double cz,
+                    double fx, double fz, double rx, double rz, double a0, double a1, double r0, double r1, int life) {
+            super(new SoundEvent(new ResourceLocation(NS, event)), SoundSource.AMBIENT, RandomSource.create());
+            this.gain = gain;
+            this.cx = cx; this.cz = cz;
+            this.fx = fx; this.fz = fz; this.rx = rx; this.rz = rz;
+            this.a0 = a0; this.a1 = a1; this.r0 = r0; this.r1 = r1;
+            this.life = life;
             this.looping = false;
             this.delay = 0;
             this.relative = false;
-            this.attenuation = SoundInstance.Attenuation.NONE;   // no engine fading: we do it below
-            this.x = px;
-            this.y = py;
-            this.z = pz;
+            this.attenuation = SoundInstance.Attenuation.NONE;   // no engine fading: we do it in tick()
             this.pitch = pitch;
+            this.y = cy;
             this.volume = 0.0001F;
+            this.place(0.0D);
             this.tick();
+        }
+
+        private void place(double k) {
+            double a = a0 + (a1 - a0) * k, r = r0 + (r1 - r0) * k;
+            double c = Math.cos(a), s = Math.sin(a);
+            this.x = cx + r * (fx * c + rx * s);
+            this.z = cz + r * (fz * c + rz * s);
         }
 
         @Override
@@ -312,9 +377,10 @@ public final class SlenderAmbience {
                 this.stop();
                 return;
             }
+            this.place(Math.min(1.0D, age++ / (double) life));
             double d = Math.sqrt(p.distanceToSqr(this.x, this.y, this.z));
             float fall = d <= BUSH_FULL_DIST ? 1.0F : (float) (BUSH_FULL_DIST / d);
-            this.volume = Math.max(VOLUME * BUSH_VOLUME * fall, 0.0001F);
+            this.volume = Math.max(VOLUME * gain * fall, 0.0001F);
         }
     }
 

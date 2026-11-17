@@ -1,6 +1,9 @@
 {
   "wind": {"sounds": [{"name": "slenderambient:wind", "stream": true}]},
   "bass": {"sounds": [{"name": "slenderambient:bassambiance", "stream": true}]},
+  "foot3d_a": {"sounds": ["slenderambient:foot3d_a"]},
+  "foot3d_b": {"sounds": ["slenderambient:foot3d_b"]},
+  "foot3d_c": {"sounds": ["slenderambient:foot3d_c"]},
   "bush": {"sounds": ["slenderambient:bush_move"]},
   "footsteps_l":    {"sounds": ["slenderambient:foot_l_a", "slenderambient:foot_l_b", "slenderambient:foot_l_c"]},
   "footsteps_r":    {"sounds": ["slenderambient:foot_r_a", "slenderambient:foot_r_b", "slenderambient:foot_r_c"]},
