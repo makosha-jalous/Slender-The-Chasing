@@ -31,6 +31,8 @@ import net.minecraftforge.fml.common.Mod;
  *  - WIND (wind.ogg): a loop that plays OUTSIDE. Inside a building it is 70 % quieter, deep underground it is silent.
  *    Going inside it fades out in 2 s, coming out it fades in again in 3 s.
  *  - BASS (bassambiance.ogg): a loop that plays only INSIDE buildings and in caves, and only while a Slenderman exists.
+ *  - BUSH (bush_move.ogg): a sound in the world (not in the head): at a random point up to 45 blocks from the player, the loudness falls with
+ *    the distance like in the original; the same timer range as the footsteps. The leaves (footsteps and bush) are silent indoors and in caves.
  *  - FOOTSTEPS (foot_*.ogg): only while a Slenderman exists. Every 30 s - 2 min, at random: left only, right only,
  *    both channels (steady or getting louder), or sliding from left to right / from right to left.
  *    The pitch and the speed are a little different every time.
@@ -66,6 +68,18 @@ public final class SlenderAmbience {
     /** he is still counted as "in the world" this long after the client saw him last (he can be parked far away). */
     private static final int SLENDER_GRACE_TICKS = 20 * 30;
 
+    /** the leaves / bushes (the footsteps and the bush sound) are heard only OUTSIDE: not inside buildings, not in caves (no leaves = nobody walks there). */
+    private static final boolean LEAVES_OUTSIDE_ONLY = true;
+    /** the bush sound (bush_move.ogg): pause between two plays, the same range as the footsteps (30 s .. 2 min). */
+    private static final int BUSH_MIN_TICKS = 20 * 30;
+    private static final int BUSH_RANDOM_TICKS = 20 * 90;
+    /** extra volume of the bush sound (1 = as the basic volume). */
+    private static final float BUSH_VOLUME = 1.0F;
+    /** as in the original: it plays at a random point up to 45 blocks from the player; full loudness inside 20 blocks, then it fades like 20 / distance. */
+    private static final int BUSH_MAX_DIST = 45;
+    private static final float BUSH_FULL_DIST = 20.0F;
+    private static final float BUSH_PITCH_VAR = 0.1F;
+
     private static final String NS = "slenderambient";
     private static final String[] FOOT_EVENTS = {
             "footsteps_l", "footsteps_r", "footsteps_both", "footsteps_rise", "footsteps_lr", "footsteps_rl"};
@@ -84,6 +98,7 @@ public final class SlenderAmbience {
     private static int graceLeft = 0;
     private static boolean dying = false;
     private static int footWait = -1;
+    private static int bushWait = -1;
     /** counts every client tick: the age of a loop is measured with it (a loop whose start was muted never ticks by itself). */
     private static int tickCounter = 0;
 
@@ -221,15 +236,22 @@ public final class SlenderAmbience {
         windSound = manageLoop(sm, windSound, WIND, "wind", WIND_VOLUME);
         bassSound = manageLoop(sm, bassSound, BASS, "bass", BASS_VOLUME);
 
-        // ---- footsteps
+        // ---- footsteps (leaves) and the bush sound: each has its own timer; nothing is played indoors / in caves
+        boolean leavesOk = !LEAVES_OUTSIDE_ONLY || zone == 0;
         if (slender) {
             if (footWait < 0) footWait = FOOT_MIN_TICKS + RNG.nextInt(FOOT_RANDOM_TICKS + 1);
             else if (--footWait == 0) {
-                playFootsteps(sm);
+                if (leavesOk) playFootsteps(sm);
                 footWait = -1;
+            }
+            if (bushWait < 0) bushWait = BUSH_MIN_TICKS + RNG.nextInt(BUSH_RANDOM_TICKS + 1);
+            else if (--bushWait == 0) {
+                if (leavesOk) playBush(sm, mc);
+                bushWait = -1;
             }
         } else {
             footWait = -1;
+            bushWait = -1;
         }
     }
 
@@ -256,6 +278,46 @@ public final class SlenderAmbience {
                 RandomSource.create(), false, 0, SoundInstance.Attenuation.NONE, 0.0D, 0.0D, 0.0D, true));
     }
 
+    /** the bush sound is placed in the world: a random point up to 45 blocks around the player (as in the original), it stays there. */
+    private static void playBush(SoundManager sm, Minecraft mc) {
+        Player p = mc.player;
+        if (p == null) return;
+        double a = RNG.nextDouble() * Math.PI * 2.0D;
+        double dx = Math.cos(a) * RNG.nextInt(BUSH_MAX_DIST + 1);
+        double dz = Math.sin(a) * RNG.nextInt(BUSH_MAX_DIST + 1);
+        float pitch = 1.0F + (RNG.nextFloat() * 2.0F - 1.0F) * BUSH_PITCH_VAR;
+        sm.play(new BushSound(p.getX() + dx, p.getY(), p.getZ() + dz, pitch));
+    }
+
+    /** a sound standing at one point of the world: the direction comes from the position, the loudness is set by us (the distance changes while the player walks). */
+    private static final class BushSound extends AbstractTickableSoundInstance {
+        BushSound(double px, double py, double pz, float pitch) {
+            super(new SoundEvent(new ResourceLocation(NS, "bush")), SoundSource.AMBIENT, RandomSource.create());
+            this.looping = false;
+            this.delay = 0;
+            this.relative = false;
+            this.attenuation = SoundInstance.Attenuation.NONE;   // no engine fading: we do it below
+            this.x = px;
+            this.y = py;
+            this.z = pz;
+            this.pitch = pitch;
+            this.volume = 0.0001F;
+            this.tick();
+        }
+
+        @Override
+        public void tick() {
+            Player p = Minecraft.getInstance().player;
+            if (p == null) {
+                this.stop();
+                return;
+            }
+            double d = Math.sqrt(p.distanceToSqr(this.x, this.y, this.z));
+            float fall = d <= BUSH_FULL_DIST ? 1.0F : (float) (BUSH_FULL_DIST / d);
+            this.volume = Math.max(VOLUME * BUSH_VOLUME * fall, 0.0001F);
+        }
+    }
+
     private static void reset() {
         if (windSound != null) windSound.halt();
         if (bassSound != null) bassSound.halt();
@@ -271,6 +333,7 @@ public final class SlenderAmbience {
         graceLeft = 0;
         dying = false;
         footWait = -1;
+        bushWait = -1;
     }
 
     // ---------------------------------------------------------------- outside / inside / cave

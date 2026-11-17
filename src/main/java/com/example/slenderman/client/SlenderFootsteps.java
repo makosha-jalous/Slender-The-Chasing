@@ -18,7 +18,7 @@ import net.minecraftforge.fml.common.Mod;
  * Our own footsteps instead of the vanilla ones (grass, dirt, gravel, wood, snow ... everything EXCEPT sand, stone and metal).
  *
  * One step = two sounds at once: a random "clothing" + a random "step" (sounds.json: footstep_clothing / footstep_step).
- * Volume: walking 10 %, running 20 %.
+ * Volume: walking 10 %, running 20 %. On grass, dirt, gravel and mud the "step" is 20 % louder (the "clothing" is not).
  *
  * It does not make its own rhythm: it replaces every vanilla step sound of the player ("block.xxx.step" right at the player),
  * so the pace is the vanilla pace, and in the camera mode - the pace of the camera mod (it plays its own steps through the
@@ -36,6 +36,10 @@ public class SlenderFootsteps {
             "sand", "stone", "deepslate", "tuff", "calcite", "basalt", "bricks", "netherrack", "gilded", "ancient_debris",
             "metal", "chain", "copper", "anvil", "lantern", "netherite", "iron", "glass", "amethyst", "bone_block", "coral"
     };
+
+    /** on these surfaces (ground: grass, dirt, gravel, mud) the "step" sound is louder than the "clothing" one: 1.2 = 20 % louder. */
+    public static final float GROUND_STEP_BOOST = 1.20F;
+    private static final String[] GROUND = {"grass", "gravel", "dirt", "mud"};
 
     private static final SoundEvent CLOTHING = new SoundEvent(new ResourceLocation(SlendermanMod.ID, "footstep_clothing"));
     private static final SoundEvent STEP = new SoundEvent(new ResourceLocation(SlendermanMod.ID, "footstep_step"));
@@ -55,8 +59,10 @@ public class SlenderFootsteps {
 
         e.setSound(null);                                          // the vanilla step is replaced by the pair
         float vol = mc.player.isSprinting() ? RUN_VOLUME : WALK_VOLUME;
+        boolean ground = false;
+        for (String g : GROUND) if (path.contains(g)) { ground = true; break; }
         play(mc, CLOTHING, vol);
-        play(mc, STEP, vol);
+        play(mc, STEP, ground ? vol * GROUND_STEP_BOOST : vol);
     }
 
     private static void play(Minecraft mc, SoundEvent ev, float vol) {
