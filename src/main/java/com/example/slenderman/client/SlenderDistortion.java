@@ -124,7 +124,7 @@ public final class SlenderDistortion {
     /** how many waves fit into the height of the plane (the old screen version had dozens: that was too many). */
     private static final float MASK_WAVES = 1.3F;
     /** how strong the bending of the plane is against the old screen version (the original bends the picture less: ghosts and ripples, not melting). */
-    private static final float MASK_AMOUNT = 0.35F;
+    private static final float MASK_AMOUNT = 0.15F;
 
     @Mod.EventBusSubscriber(modid = SlendermanMod.ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static final class Reg {
