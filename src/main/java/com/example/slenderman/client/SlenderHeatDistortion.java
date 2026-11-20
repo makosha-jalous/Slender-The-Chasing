@@ -12,9 +12,11 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.math.Matrix4f;
+import com.mojang.math.Vector4f;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
@@ -67,7 +69,8 @@ public final class SlenderHeatDistortion {
                         ),
                         instance -> heatShader = instance
                 );
-            } catch (Throwable ignored) {
+            } catch (Throwable t) {
+                t.printStackTrace();
                 heatShader = null;
             }
         }
@@ -96,7 +99,8 @@ public final class SlenderHeatDistortion {
 
         try {
             renderDistortionMesh(mc, event, target);
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            t.printStackTrace();
         } finally {
             mc.getMainRenderTarget().bindWrite(false);
             RenderSystem.depthMask(true);
@@ -217,17 +221,21 @@ public final class SlenderHeatDistortion {
         float py = cy + sy * RADIUS_Y;
         float pz = cz + sz * RADIUS_XZ;
 
-        // Нормаль эллипсоида для корректного расчёта dot(N, V)^2
+        // Нормаль эллипсоида в пространстве камеры для корректного dot(N, V)^2
         float nx = sx / RADIUS_XZ;
         float ny = sy / RADIUS_Y;
         float nz = sz / RADIUS_XZ;
         float invLen = 1.0F / (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
-        nx *= invLen;
-        ny *= invLen;
-        nz *= invLen;
+        Vector4f norm = new Vector4f(nx * invLen, ny * invLen, nz * invLen, 0.0F);
+        norm.transform(m);
 
         b.vertex(m, px, py, pz)
-                .color(nx * 0.5F + 0.5F, ny * 0.5F + 0.5F, nz * 0.5F + 0.5F, 1.0F)
+                .color(
+                        Mth.clamp(norm.x() * 0.5F + 0.5F, 0.0F, 1.0F),
+                        Mth.clamp(norm.y() * 0.5F + 0.5F, 0.0F, 1.0F),
+                        Mth.clamp(norm.z() * 0.5F + 0.5F, 0.0F, 1.0F),
+                        1.0F
+                )
                 .uv(u, v)
                 .endVertex();
     }
