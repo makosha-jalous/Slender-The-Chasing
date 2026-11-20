@@ -4,8 +4,8 @@
         "srcrgb": "srcalpha",
         "dstrgb": "1-srcalpha"
     },
-    "vertex": "heat_distortion",
-    "fragment": "heat_distortion",
+    "vertex": "slenderman:heat_distortion",
+    "fragment": "slenderman:heat_distortion",
     "attributes": [
         "Position",
         "Color",
