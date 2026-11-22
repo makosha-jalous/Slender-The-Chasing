@@ -40,6 +40,12 @@ public final class OriginalHeatDistortion {
     private static final float TILE_U = 3.0F;         // noise tiling around the body (a whole number, so there is no seam)
     private static final float TILE_V = 2.0F;         // noise tiling from top to bottom
 
+    // ---- measured on the video of the original (30 fps) ----
+    private static final float FLICKER_CHANCE = 0.29F;   // the effect is on in ~29 % of the frames, in bursts of 1-3 frames
+    private static final long FLICKER_SLOT_NANOS = 33_333_333L;   // one frame of the original
+    private static final float WARP_GAIN = 2.5F;         // extra bend of the picture (1.0 = the formula only; raise it for stronger waves)
+    private static final float GAIN_R = 1.8F, GAIN_G = 1.7F, GAIN_B = 1.3F;   // in the effect the picture is ~1.7x brighter, less in blue
+
     // ---- the ellipsoid around Slenderman (blocks) ----
     private static final float RADIUS_XZ = 1.6F;
     private static final float RADIUS_Y = 2.0F;
@@ -86,11 +92,22 @@ public final class OriginalHeatDistortion {
             lastLog = System.currentTimeMillis();
             System.out.println("[SlenderHeat] drawing, distance " + Math.round(target.distanceTo(mc.player)) + ", fbo " + 0);
         }
+        if (!DEBUG && !flickerOn()) return;
         try {
             draw(mc, event, target);
         } catch (Throwable t) {
             t.printStackTrace();
         }
+    }
+
+    /** on / off in steps of one frame of the original, random, ~29 % on. */
+    private static boolean flickerOn() {
+        long slot = System.nanoTime() / FLICKER_SLOT_NANOS;
+        long h = slot * 0x9E3779B97F4A7C15L;
+        h ^= (h >>> 29);
+        h *= 0xBF58476D1CE4E5B9L;
+        h ^= (h >>> 32);
+        return ((h & 0xFFFFL) / 65536.0F) < FLICKER_CHANCE;
     }
 
     private static SlendermanEntity closest(Minecraft mc) {
@@ -149,6 +166,7 @@ public final class OriginalHeatDistortion {
             shader.safeGetUniform("ScreenSize").set((float) w, (float) h);
             shader.safeGetUniform("Params").set(STRENGTH, TRANSPARENCY, time, DEBUG ? 1.0F : 0.0F);
             shader.safeGetUniform("Tiling").set(TILE_U, TILE_V);
+            shader.safeGetUniform("Gain").set(GAIN_R, GAIN_G, GAIN_B, WARP_GAIN);
 
             BufferBuilder b = Tesselator.getInstance().getBuilder();
             b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR_TEX);
