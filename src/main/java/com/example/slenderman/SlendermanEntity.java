@@ -807,6 +807,42 @@ public class SlendermanEntity extends PathfinderMob {
         }
     }
 
+    // ---- walking inside structures: a path to the player, followed node by node ----
+    private Path indoorPath;
+    private int indoorPathTimer, indoorCheckTimer;
+    private boolean indoorCached;
+
+    /** the player or he himself is inside a structure (checked twice a second only). */
+    private boolean indoorsNow(Player player) {
+        if (--this.indoorCheckTimer <= 0) {
+            this.indoorCheckTimer = 10;
+            this.indoorCached = this.playerIndoors(player)
+                    || Enclosure.isEnclosed(this.level, this.getX(), this.getEyeY(), this.getZ());
+            if (!this.indoorCached) this.indoorPath = null;
+        }
+        return this.indoorCached;
+    }
+
+    /** the next point of the path to the player (null = no path: then he walks straight as before). */
+    private Vec3 nextPathGoal(Player player) {
+        if (--this.indoorPathTimer <= 0 || this.indoorPath == null || this.indoorPath.isDone()) {
+            this.indoorPathTimer = 10;
+            this.indoorPath = this.getNavigation().createPath(player, 0);
+        }
+        Path path = this.indoorPath;
+        if (path == null || path.isDone()) return null;
+        // skip the nodes he has already reached
+        while (!path.isDone()) {
+            BlockPos n = path.getNextNodePos();
+            double dx = n.getX() + 0.5D - this.getX(), dz = n.getZ() + 0.5D - this.getZ();
+            if (dx * dx + dz * dz < 0.5D && Math.abs(n.getY() - this.getY()) < 1.5D) path.advance();
+            else break;
+        }
+        if (path.isDone()) return null;
+        BlockPos n = path.getNextNodePos();
+        return new Vec3(n.getX() + 0.5D, n.getY(), n.getZ() + 0.5D);
+    }
+
     /** every second: can he walk to the player at all? A player who is high up or shut away "hides". */
     private void updateReachability(Player player, double dist) {
         if (--this.reachTimer > 0) return;
@@ -903,6 +939,7 @@ public class SlendermanEntity extends PathfinderMob {
     private void standStill() {
         this.getNavigation().stop();
         this.pathRetry = 0;
+        this.indoorPath = null;
         this.sideTicks = 0;
         this.setZza(0.0F);
         this.setXxa(0.0F);
@@ -1328,6 +1365,11 @@ public class SlendermanEntity extends PathfinderMob {
         blocksPerSecond = Math.min(blocksPerSecond, WALK_BPS_MAX);
         double mul = blocksPerSecond / 20.0D / BLOCKS_PER_TICK_AT_ONE;
         Vec3 goal = player.position();
+        // inside a structure (corridors, rooms, caves) he follows a path around the walls instead of walking straight into them
+        if (this.indoorsNow(player)) {
+            Vec3 node = this.nextPathGoal(player);
+            if (node != null) goal = node;
+        }
         // the body and the head turn smoothly to the player all the time; he walks straight at the player and goes around things SIDEWAYS
         this.faceToward(player.position(), WALK_TURN_DEG);
         this.strafeWalking = true;
