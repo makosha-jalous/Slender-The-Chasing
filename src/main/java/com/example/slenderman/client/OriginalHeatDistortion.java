@@ -12,6 +12,8 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.math.Matrix4f;
+import com.mojang.math.Vector4f;
+import net.minecraft.util.Mth;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
@@ -47,6 +49,10 @@ public final class OriginalHeatDistortion {
 
     private static final ResourceLocation NOISE_TEX = new ResourceLocation(SlendermanMod.ID, "textures/effect/heat_noise.png");
 
+    /** TEST MODE: true = the ellipsoid is drawn as a red transparent ball and the log (latest.log) says what happens. Set false when done. */
+    private static final boolean DEBUG = false;
+    private static long lastLog;
+
     private static ShaderInstance shader;
     private static RenderTarget grab;
 
@@ -59,9 +65,10 @@ public final class OriginalHeatDistortion {
             try {
                 event.registerShader(
                         new ShaderInstance(event.getResourceManager(), new ResourceLocation(SlendermanMod.ID, "original_heat"),
-                                DefaultVertexFormat.POSITION_TEX),
-                        instance -> shader = instance);
+                                DefaultVertexFormat.POSITION_COLOR_TEX),
+                        instance -> { shader = instance; if (DEBUG) System.out.println("[SlenderHeat] shader loaded"); });
             } catch (Throwable t) {
+                System.out.println("[SlenderHeat] shader FAILED to load");
                 t.printStackTrace();
                 shader = null;
             }
@@ -75,6 +82,10 @@ public final class OriginalHeatDistortion {
         if (mc.player == null || mc.level == null) return;
         SlendermanEntity target = closest(mc);
         if (target == null) return;
+        if (DEBUG && System.currentTimeMillis() - lastLog > 3000L) {
+            lastLog = System.currentTimeMillis();
+            System.out.println("[SlenderHeat] drawing, distance " + Math.round(target.distanceTo(mc.player)) + ", fbo " + 0);
+        }
         try {
             draw(mc, event, target);
         } catch (Throwable t) {
@@ -96,11 +107,10 @@ public final class OriginalHeatDistortion {
     }
 
     private static void draw(Minecraft mc, RenderLevelStageEvent event, SlendermanEntity target) {
-        // the framebuffer the world is being drawn into right now (the vanilla one, or the one of a shader pack)
-        int curFbo = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
-        int[] vp = new int[4];
-        GL11.glGetIntegerv(GL11.GL_VIEWPORT, vp);
-        int w = vp[2], h = vp[3];
+        // the same way as the version that worked with shader packs: the main target, the matrices of the game stay untouched,
+        // the pose of the camera is applied to the vertices here
+        RenderTarget main = mc.getMainRenderTarget();
+        int w = main.width, h = main.height;
         if (w <= 0 || h <= 0) return;
 
         if (grab == null) {
@@ -111,11 +121,10 @@ public final class OriginalHeatDistortion {
         }
 
         // GrabPass: copy the frame
-        GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, curFbo);
+        GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, main.frameBufferId);
         GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, grab.frameBufferId);
-        GL30.glBlitFramebuffer(vp[0], vp[1], vp[0] + w, vp[1] + h, 0, 0, w, h, GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST);
-        GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, curFbo);
-        GL11.glViewport(vp[0], vp[1], vp[2], vp[3]);
+        GL30.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL11.GL_COLOR_BUFFER_BIT, GL11.GL_LINEAR);
+        main.bindWrite(false);
 
         Vec3 cam = event.getCamera().getPosition();
         Vec3 pos = target.getPosition(event.getPartialTick());
@@ -123,14 +132,7 @@ public final class OriginalHeatDistortion {
         float cy = (float) (pos.y + target.getBbHeight() * 0.5D - cam.y);
         float cz = (float) (pos.z - cam.z);
         float time = (System.nanoTime() / 1_000_000L % 3_600_000L) / 1000.0F;
-
-        // the world matrices of this moment (rotation of the camera, projection)
-        Matrix4f oldProj = RenderSystem.getProjectionMatrix().copy();
-        RenderSystem.setProjectionMatrix(event.getProjectionMatrix());
-        RenderSystem.getModelViewStack().pushPose();
-        RenderSystem.getModelViewStack().last().pose().setIdentity();
-        RenderSystem.getModelViewStack().last().pose().multiply(event.getPoseStack().last().pose());
-        RenderSystem.applyModelViewMatrix();
+        Matrix4f m = event.getPoseStack().last().pose();
 
         try {
             RenderSystem.enableBlend();
@@ -145,43 +147,45 @@ public final class OriginalHeatDistortion {
             RenderSystem.setShaderTexture(0, grab.getColorTextureId());
             RenderSystem.setShaderTexture(1, NOISE_TEX);
             shader.safeGetUniform("ScreenSize").set((float) w, (float) h);
-            shader.safeGetUniform("Params").set(STRENGTH, TRANSPARENCY, time, 0.0F);
+            shader.safeGetUniform("Params").set(STRENGTH, TRANSPARENCY, time, DEBUG ? 1.0F : 0.0F);
             shader.safeGetUniform("Tiling").set(TILE_U, TILE_V);
-            shader.safeGetUniform("Center").set(cx, cy, cz);
-            shader.safeGetUniform("Radii").set(RADIUS_XZ, RADIUS_Y, RADIUS_XZ);
 
             BufferBuilder b = Tesselator.getInstance().getBuilder();
-            b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+            b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR_TEX);
             for (int j = 0; j < STACKS; j++) {
                 float v0 = (float) j / STACKS, v1 = (float) (j + 1) / STACKS;
                 double p0 = Math.PI * v0, p1 = Math.PI * v1;
                 for (int i = 0; i < SLICES; i++) {
                     float u0 = (float) i / SLICES, u1 = (float) (i + 1) / SLICES;
                     double t0 = 2.0D * Math.PI * u0, t1 = 2.0D * Math.PI * u1;
-                    vert(b, cx, cy, cz, p0, t0, u0, v0);
-                    vert(b, cx, cy, cz, p0, t1, u1, v0);
-                    vert(b, cx, cy, cz, p1, t1, u1, v1);
-                    vert(b, cx, cy, cz, p1, t0, u0, v1);
+                    vert(b, m, cx, cy, cz, p0, t0, u0, v0);
+                    vert(b, m, cx, cy, cz, p0, t1, u1, v0);
+                    vert(b, m, cx, cy, cz, p1, t1, u1, v1);
+                    vert(b, m, cx, cy, cz, p1, t0, u0, v1);
                 }
             }
             BufferUploader.drawWithShader(b.end());
         } finally {
-            RenderSystem.getModelViewStack().popPose();
-            RenderSystem.applyModelViewMatrix();
-            RenderSystem.setProjectionMatrix(oldProj);
+            main.bindWrite(false);
             RenderSystem.colorMask(true, true, true, true);
             RenderSystem.depthMask(true);
             RenderSystem.enableCull();
             RenderSystem.defaultBlendFunc();
             RenderSystem.disableBlend();
-            GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, curFbo);
         }
     }
 
-    private static void vert(BufferBuilder b, float cx, float cy, float cz, double phi, double theta, float u, float v) {
-        float sp = (float) Math.sin(phi);
-        b.vertex(cx + sp * (float) Math.cos(theta) * RADIUS_XZ,
-                 cy + (float) Math.cos(phi) * RADIUS_Y,
-                 cz + sp * (float) Math.sin(theta) * RADIUS_XZ).uv(u, v).endVertex();
+    /** a vertex of the ellipsoid; the normal (in the space of the camera) travels in the colour. */
+    private static void vert(BufferBuilder b, Matrix4f m, float cx, float cy, float cz, double phi, double theta, float u, float v) {
+        float sp = (float) Math.sin(phi), cp = (float) Math.cos(phi);
+        float sx = sp * (float) Math.cos(theta), sy = cp, sz = sp * (float) Math.sin(theta);
+        float nx = sx / RADIUS_XZ, ny = sy / RADIUS_Y, nz = sz / RADIUS_XZ;
+        float inv = 1.0F / (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+        Vector4f n = new Vector4f(nx * inv, ny * inv, nz * inv, 0.0F);
+        n.transform(m);
+        b.vertex(m, cx + sx * RADIUS_XZ, cy + sy * RADIUS_Y, cz + sz * RADIUS_XZ)
+                .color(Mth.clamp(n.x() * 0.5F + 0.5F, 0.0F, 1.0F), Mth.clamp(n.y() * 0.5F + 0.5F, 0.0F, 1.0F),
+                        Mth.clamp(n.z() * 0.5F + 0.5F, 0.0F, 1.0F), 1.0F)
+                .uv(u, v).endVertex();
     }
 }

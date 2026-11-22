@@ -16,6 +16,7 @@ in float amount;
 out vec4 fragColor;
 
 void main() {
+    if (Params.w > 0.5) { fragColor = vec4(1.0, 0.0, 0.0, 0.45); return; }
     float alpha = clamp(amount / max(Params.y, 0.0001), 0.0, 1.0);
     if (alpha <= 0.002) discard;
 
