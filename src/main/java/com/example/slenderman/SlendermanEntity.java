@@ -139,9 +139,9 @@ public class SlendermanEntity extends PathfinderMob {
     // The timed close-in after page 7 has been removed: normal stalking distance is always used.
     /** no teleport ever puts him closer than this to the player (blocks, horizontal): the hitboxes must never touch by a teleport. */
     private static final double TELEPORT_MIN_DIST = 1.1D;
-    /** the distance band he keeps while stalking (blocks), index = pages collected: pages 1-2: 30-35, 3: 13-17, 4: 10-13, 5: 7-9, 6: 5-7, 7: exactly 2. */
+    /** the distance band he keeps while stalking (blocks), index = pages collected: pages 1-2: 30-35, 3: 13-17, 4: 10-13, 5: 7-9, 6: 5-7, 7: 4-2. */
     private static final double[] BAND_MIN = {30.0, 30.0, 30.0, 13.0, 10.0,  7.0,  5.0,  2.0,  3.0};
-    private static final double[] BAND_MAX = {35.0, 35.0, 35.0, 17.0, 13.0,  9.0,  7.0,  2.0,  4.0};
+    private static final double[] BAND_MAX = {35.0, 35.0, 35.0, 17.0, 13.0,  9.0,  7.0,  4.0,  4.0};
     /** the START distance (the page-1 band), kept apart and never changed: the angry teleport takes an eighth of it (as the original's minRangeCache / maxRangeCache). */
     private static final double START_MIN = 30.0D;
     private static final double START_MAX = 35.0D;
