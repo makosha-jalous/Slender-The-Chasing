@@ -36,7 +36,7 @@ public class SlendermanRoamingSound extends AbstractTickableSoundInstance {
     /** how much of the screen counts as "in view" (dot product with the view direction, 0.5 = 60 degrees to each side). */
     private static final double VIEW_COS = 0.5D;
     /** closer than this (blocks, centre to centre) he is heard even when he is not in view, e.g. right behind you. */
-    private static final double NEAR_RANGE = 3.0D;
+    private static final double NEAR_RANGE = 1.7D;
 
     /**
      * The sound category of the screamers (dramatic1a/b/c): they are NOT cut off by the black screen of the death scene,

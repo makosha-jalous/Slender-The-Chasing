@@ -139,9 +139,9 @@ public class SlendermanEntity extends PathfinderMob {
     // The timed close-in after page 7 has been removed: normal stalking distance is always used.
     /** no teleport ever puts him closer than this to the player (blocks, horizontal): the hitboxes must never touch by a teleport. */
     private static final double TELEPORT_MIN_DIST = 1.1D;
-    /** the distance band he keeps while stalking (blocks), index = pages collected: pages 1-2: 30-35, 3: 13-17, 4: 10-13, 5: 7-9, 6: 5-7, 7: 3-5. */
-    private static final double[] BAND_MIN = {30.0, 30.0, 30.0, 13.0, 10.0,  7.0,  5.0,  3.0,  3.0};
-    private static final double[] BAND_MAX = {35.0, 35.0, 35.0, 17.0, 13.0,  9.0,  7.0,  5.0,  4.0};
+    /** the distance band he keeps while stalking (blocks), index = pages collected: pages 1-2: 30-35, 3: 13-17, 4: 10-13, 5: 7-9, 6: 5-7, 7: exactly 2. */
+    private static final double[] BAND_MIN = {30.0, 30.0, 30.0, 13.0, 10.0,  7.0,  5.0,  2.0,  3.0};
+    private static final double[] BAND_MAX = {35.0, 35.0, 35.0, 17.0, 13.0,  9.0,  7.0,  2.0,  4.0};
     /** the START distance (the page-1 band), kept apart and never changed: the angry teleport takes an eighth of it (as the original's minRangeCache / maxRangeCache). */
     private static final double START_MIN = 30.0D;
     private static final double START_MAX = 35.0D;
@@ -185,6 +185,8 @@ public class SlendermanEntity extends PathfinderMob {
     private static final double ORIGINAL_WALK_BASE = 0.5D;
     /** 1.0 = the speed of the original in blocks per second; make it smaller to slow him down. */
     private static final double ORIGINAL_WALK_SCALE = 1.0D;
+    /** pages 2-7: his walking speed, blocks per second (the same on all of these pages; only while he is not seen). */
+    private static final double FIXED_WALK_BPS = 2.0D;
     /**
      * Keeping the page distance: when he is farther than the band of the page (BAND_MAX), he walks at least as fast as the player times this
      * (index = pages), so he always manages to come back to his distance; the more pages, the faster than the player he is.
@@ -238,8 +240,8 @@ public class SlendermanEntity extends PathfinderMob {
     public static final int DEATH_BLACK_MAX_TICKS = 30;
     /** blocks per tick (walking = 0.215, sprinting = 0.28). */
     private static final double RUN_SPEED = 0.24D;
-    /** closer than this and behind the player's back (roaming.ogg plays) he takes the sanity without being looked at. */
-    private static final double BEHIND_RANGE = 3.0D;
+    /** closer than this and behind the player's back (roaming.ogg plays) he takes the sanity without being looked at (1.7 = about one empty block between them). */
+    private static final double BEHIND_RANGE = 1.7D;
 
     // ---- sanity ----
     /** farther than this he is not "looked at" any more (blocks). */
@@ -1322,7 +1324,7 @@ public class SlendermanEntity extends PathfinderMob {
         if (dist > BAND_MIN[st]) {
             // the step brings him closer; when he is in front of the player he stays at least 3-4 blocks away
             double keep = this.isInFront(player, this.getX(), this.getZ())
-                    ? FRONT_MIN_DIST + this.random.nextDouble() * FRONT_MIN_RANDOM : CATCH_DIST + 0.6D;
+                    ? FRONT_MIN_DIST + this.random.nextDouble() * FRONT_MIN_RANDOM : Math.min(CATCH_DIST + 0.6D, BAND_MIN[st]);
             return this.creepCloser(player, 4.0D, keep);
         }
         for (int attempt = 0; attempt < 24; attempt++) {
@@ -1332,7 +1334,8 @@ public class SlendermanEntity extends PathfinderMob {
             double z = this.getZ() + Math.sin(angle) * r;
             double dx = x - player.getX();
             double dz = z - player.getZ();
-            if (dx * dx + dz * dz < (CATCH_DIST + 0.6D) * (CATCH_DIST + 0.6D)) continue;
+            double minD = Math.min(CATCH_DIST + 0.6D, BAND_MIN[st]);
+            if (dx * dx + dz * dz < minD * minD) continue;
             double y = this.findGround(x, z, this.getY(), 4.0D, this.planeDy(player));
             if (Double.isNaN(y)) continue;
             float yaw = (float) (Mth.atan2(player.getZ() - z, player.getX() - x) * 57.29577951308232D) - 90.0F;
@@ -1343,7 +1346,7 @@ public class SlendermanEntity extends PathfinderMob {
     }
 
     /**
-     * From page 2 through page 7 he walks at a fixed 1 block per second, only while unseen.
+     * From page 2 through page 7 he walks at a fixed FIXED_WALK_BPS (2 blocks per second), only while unseen.
      * The player-distance catch-up bonus is deliberately disabled for these stages so it cannot raise that speed.
      */
     private boolean originalWalk(Player player, double dist) {
@@ -1354,7 +1357,7 @@ public class SlendermanEntity extends PathfinderMob {
         }
         boolean fixedWalkSpeed = st >= 2 && st <= 7;
         double blocksPerSecond = fixedWalkSpeed
-                ? 1.0D
+                ? FIXED_WALK_BPS
                 : (st + LEVEL + ORIGINAL_WALK_BASE) * ORIGINAL_WALK_SCALE;
         if (!fixedWalkSpeed && dist > BAND_MAX[st]) {
             // Outside pages 2-7, retain the original distance-based catch-up behavior.
