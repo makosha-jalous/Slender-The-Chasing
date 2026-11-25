@@ -15,8 +15,12 @@ public class SlendermanRenderer extends MobRenderer<SlendermanEntity, Slenderman
     private static final ResourceLocation DEATH_TEXTURE =
             new ResourceLocation("slenderman", "textures/entity/slenderman_death.png");
 
+    /** the new 3D mesh model; it is used while /slenderskin is "mesh" (the default of this test version). */
+    private final SlendermanMeshRenderer meshRenderer;
+
     public SlendermanRenderer(EntityRendererProvider.Context context) {
         super(context, new SlendermanModel(context.bakeLayer(SlendermanModel.LAYER)), 0.6F);
+        this.meshRenderer = new SlendermanMeshRenderer(context);
     }
 
     /** for a few ticks after a teleport he is not drawn at all: he disappears here and appears there, he never glides. */
@@ -24,6 +28,11 @@ public class SlendermanRenderer extends MobRenderer<SlendermanEntity, Slenderman
     public void render(SlendermanEntity entity, float entityYaw, float partialTick, PoseStack poseStack,
                        MultiBufferSource buffer, int packedLight) {
         if (entity.isTeleportHidden()) return;
+        // the new mesh model (if its files could not be read, the classic model is drawn instead)
+        if (SlenderSkin.useMesh() && SlendermanMeshModel.ensureLoaded()) {
+            meshRenderer.render(entity, entityYaw, partialTick, poseStack, buffer, packedLight);
+            return;
+        }
         super.render(entity, entityYaw, partialTick, poseStack, buffer, packedLight);
     }
 
