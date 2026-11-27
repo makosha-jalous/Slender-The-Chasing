@@ -90,6 +90,11 @@ public class SlendermanModel extends EntityModel<SlendermanEntity> {
 
     // ---- tentacles: 6 pieces, every one is a chain of 8 short tapering segments, so it bends smoothly like a snake ----
     private static final int TENTACLES = 6;
+    /**
+     * false = the 6 old cube tentacles are not drawn: the classic model gets the tentacles of the mesh instead (ClassicTentacleLayer).
+     * Set true to bring the old cube tentacles back (then the layer should be removed from SlendermanRenderer).
+     */
+    public static final boolean OLD_TENTACLES = false;
     private static final int SEGMENTS = 8;
     /** how far each pair of tentacles spreads outwards (rad). Upper pair rises, lower pair is almost level. */
     private static final float[] TENT_SPREAD = {2.45F, 2.05F, 1.70F};
@@ -590,7 +595,7 @@ public class SlendermanModel extends EntityModel<SlendermanEntity> {
             int level = i / 2;
             float seed = i * 1.93F;
             ModelPart base = tentacles[i][0];
-            base.visible = tent > 0.02F;
+            base.visible = OLD_TENTACLES && tent > 0.02F;
 
             base.xRot = Mth.lerp(fan, 1.5707964F * emerge, 0.55F) + 0.05F * e * Mth.sin(ageInTicks * 0.040F + seed * 1.3F);
             base.zRot = -tside * (TENT_SPREAD[level] * fan) + 0.06F * e * Mth.sin(ageInTicks * 0.045F + seed);
@@ -610,6 +615,11 @@ public class SlendermanModel extends EntityModel<SlendermanEntity> {
                 seg.yRot = 0F;
             }
         }
+    }
+
+    /** the torso (its rotation carries the tentacles of the mesh in ClassicTentacleLayer). */
+    public ModelPart torsoPart() {
+        return torso;
     }
 
     @Override

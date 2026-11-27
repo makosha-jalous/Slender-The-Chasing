@@ -178,6 +178,29 @@ public final class SlenderPose {
      * @param age    ageInTicks (the writhing is slow and goes on all the time)
      */
     public void poseTentacles(float amount, float age) {
+        poseTentacles(amount, age, skin[0]);
+    }
+
+    /**
+     * The skin matrix that puts the mesh tentacles on the torso of the CLASSIC (cube) model.
+     * A point of the mesh model is moved like this: to the classic torso pivot + (the torso rotation) * (point - attach),
+     * where attach = the mesh torso pivot moved by (shiftX, shiftY, shiftZ) (the classic back is shallower than the mesh back).
+     *
+     * @param out float[12]
+     */
+    public static void classicTorsoMatrix(float pivotX, float pivotY, float pivotZ,
+                                          float xRot, float yRot, float zRot,
+                                          float attachX, float attachY, float attachZ, float[] out) {
+        float[] r = new float[12], t = new float[12], a = new float[12];
+        euler(xRot, yRot, zRot, r);
+        translation(pivotX, pivotY, pivotZ, t);
+        mul(t, r, a);
+        translation(-attachX, -attachY, -attachZ, t);
+        mul(a, t, out);
+    }
+
+    /** @param torso the skin matrix of the torso (float[12]); the mesh model uses its own, the classic model {@link #classicTorsoMatrix} */
+    public void poseTentacles(float amount, float age, float[] torso) {
         if (tent == null) {
             tentVisible = false;
             return;
@@ -191,7 +214,6 @@ public final class SlenderPose {
         float fan = clamp01((e - 0.35F) / 0.65F);            // phase 2: they fan out to their real shape
         float sizeT = clamp01(e / 0.9F);
         float k = 0.10F + 0.90F * sizeT * sizeT * (3F - 2F * sizeT);   // a small copy grows to the real size
-        float[] torso = skin[0];
         float[] a = new float[12], b = new float[12], c = new float[12], d = new float[12], t = new float[12], g = new float[12];
         for (int ti = 0; ti < tent.count; ti++) {
             float[] jr = tent.joint[ti];

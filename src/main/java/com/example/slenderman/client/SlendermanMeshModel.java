@@ -55,6 +55,16 @@ public class SlendermanMeshModel extends EntityModel<SlendermanEntity> {
         return mesh != null;
     }
 
+    /** the loaded tentacles (null if the file is missing); the classic model uses them too. */
+    public static SlenderTentacles tentacleData() {
+        return tentacles;
+    }
+
+    /** the loaded body mesh (null if the file is missing). */
+    public static SlenderMesh meshData() {
+        return mesh;
+    }
+
     private final SlendermanModel classic;
     private final ModelPart[] parts = new ModelPart[SlenderMesh.RIG];
     private final float[] rot = new float[SlenderMesh.RIG * 3];

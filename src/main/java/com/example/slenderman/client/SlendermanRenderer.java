@@ -21,6 +21,8 @@ public class SlendermanRenderer extends MobRenderer<SlendermanEntity, Slenderman
     public SlendermanRenderer(EntityRendererProvider.Context context) {
         super(context, new SlendermanModel(context.bakeLayer(SlendermanModel.LAYER)), 0.6F);
         this.meshRenderer = new SlendermanMeshRenderer(context);
+        // the tentacles of the mesh also grow out of the back of the classic model
+        this.addLayer(new ClassicTentacleLayer(this));
     }
 
     /** for a few ticks after a teleport he is not drawn at all: he disappears here and appears there, he never glides. */
