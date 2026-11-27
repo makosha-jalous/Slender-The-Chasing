@@ -56,7 +56,7 @@ public final class OriginalHeatDistortion {
     private static final ResourceLocation NOISE_TEX = new ResourceLocation(SlendermanMod.ID, "textures/effect/heat_noise.png");
 
     /** TEST MODE: true = the ellipsoid is drawn as a red transparent ball and the log (latest.log) says what happens. Set false when done. */
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = true;
     private static long lastLog;
 
     private static ShaderInstance shader;
