@@ -73,7 +73,7 @@ public final class OriginalHeatDistortion {
     private static final float MASK_ABOVE = 1.6F;          // blocks above his head
     private static final float MASK_FRONT = 1.5F;          // blocks in front of him (towards the player)
     private static final float MASK_MIX = 0.82F;           // how strongly the bent copy lies over the picture (the rest is the normal picture: the ghost)
-    private static final float MASK_COLUMNS = 0.045F;      // wavy columns, in screen widths
+    private static final float MASK_COLUMNS = 0.025F;      // wavy columns, in screen widths
     private static final float MASK_SLABS = 0.060F;        // pushed blocks
     private static final float MASK_BEND = 0.030F;         // slow bend
     private static final float MASK_SOFT = 0.04F;          // soft edge of the rectangle (0 = hard)
