@@ -1,0 +1,26 @@
+{
+    "blend": {
+        "func": "add",
+        "srcrgb": "srcalpha",
+        "dstrgb": "1-srcalpha"
+    },
+    "vertex": "slenderman:mask_heat",
+    "fragment": "slenderman:mask_heat",
+    "attributes": [
+        "Position",
+        "Color",
+        "UV0"
+    ],
+    "samplers": [
+        { "name": "Sampler0" },
+        { "name": "Sampler1" }
+    ],
+    "uniforms": [
+        { "name": "ModelViewMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+        { "name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+        { "name": "ScreenSize", "type": "float", "count": 2, "values": [ 1.0, 1.0 ] },
+        { "name": "Params", "type": "float", "count": 4, "values": [ 0.0, 0.0, 0.0, 0.8 ] },
+        { "name": "Gain", "type": "float", "count": 4, "values": [ 1.7, 1.7, 1.4, 1.6 ] },
+        { "name": "Warp", "type": "float", "count": 4, "values": [ 0.04, 0.05, 0.03, 0.04 ] }
+    ]
+}
